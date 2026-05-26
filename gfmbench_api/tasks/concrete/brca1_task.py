@@ -73,7 +73,6 @@ class BRCA1Task(BaseGFMZeroShotSNVTask):
         super().__init__(root_data_dir_path, task_config)
     
     def _get_default_max_seq_len(self) -> int:
-        # return 1048576
         return 8388608
     
     def get_task_name(self):
