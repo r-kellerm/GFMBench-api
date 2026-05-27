@@ -20,17 +20,7 @@ import os
 from typing import Any, Dict, Optional, List
 import pandas as pd
 import torch
-from torch.utils.data import DataLoader
-from tqdm.auto import tqdm
 from gfmbench_api.tasks.base.base_gfm_zeroshot_snv_task import BaseGFMZeroShotSNVTask
-from gfmbench_api.metrics import (
-    SequenceEmbeddingsCosineSimAUPRC,
-    SequenceEmbeddingsCosineSimAUROC,
-    SequenceEmbeddingsL2AUPRC,
-    SequenceEmbeddingsL2AUROC,
-    SumProbsLLRAUPRC,
-    SumProbsLLRAUROC,
-)
 from gfmbench_api.utils.fileutils import download_file_from_url
 from gfmbench_api.utils.preprocutils import pad_sequence_centered_variant
 import glob
