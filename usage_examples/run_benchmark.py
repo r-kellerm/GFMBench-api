@@ -204,13 +204,10 @@ def main():
     # Get model class and max_length from registry
     if args.model not in MODEL_REGISTRY:
         raise ValueError(f"Unknown model: {args.model}. Supported models: {list(MODEL_REGISTRY.keys())}")
+    if args.model == "Evo2" and not args.linear_prob:
+        raise ValueError("Evo2 does not support full fine-tuning. Use --linear_prob for Evo2 benchmarks.")
     ModelClass = MODEL_REGISTRY[args.model]["class"]
     max_length = MODEL_REGISTRY[args.model]["max_length"]
-    force_linear_probe = bool(
-        MODEL_REGISTRY[args.model].get("force_linear_probe", False)
-        or getattr(ModelClass, "force_linear_probe", False)
-        or not getattr(ModelClass, "supports_backbone_finetuning", True)
-    )
     
     logging.info(f"Model: {args.model}, Max sequence length: {max_length}")
     
@@ -266,14 +263,12 @@ def main():
         "lr": 3e-5,
         "optimizer": "AdamW",
         "weight_decay": 0.01,
-        "only_proj_layer": args.linear_prob or force_linear_probe,
+        "only_proj_layer": args.linear_prob,
         "batch_size": 8,
     }
 
     logging.info(f"********* Number of tasks: {len(tasks)} *********")
     logging.info(f"Model: {args.model}")
-    if force_linear_probe and not args.linear_prob:
-        logging.info("Model requires a frozen backbone; forcing linear-probe training.")
     logging.info(
         f"Training mode: {'Linear Probing' if training_params['only_proj_layer'] else 'Full Fine-tuning'}"
     )
