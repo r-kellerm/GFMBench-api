@@ -57,9 +57,6 @@ class BRCA1Task(BaseGFMZeroShotSNVTask):
         # It is located in the task folder (brca1), not the shared reference_genome folder
         self.reference_genome_path = os.path.join(root_data_dir_path, self.get_task_name(), "GRCh37.p13_chr17.fna")
 
-        cfg = task_config or {}
-        self.max_samples = cfg.get("max_num_samples", None)
-
         super().__init__(root_data_dir_path, task_config)
     
     def _get_default_max_seq_len(self) -> int:
@@ -113,8 +110,8 @@ class BRCA1Task(BaseGFMZeroShotSNVTask):
         positions = []
         
         for idx, row in df.iterrows():
-            if self.max_samples is not None and len(reference_sequences) >= self.max_samples:
-                print(f"[Fast run] Using only first {self.max_samples} samples.")
+            if self.max_num_samples is not None and len(reference_sequences) >= self.max_num_samples:
+                print(f"[Fast run] Using only first {self.max_num_samples} samples.")
                 break
                 
             chrom = str(row['chrom'])
