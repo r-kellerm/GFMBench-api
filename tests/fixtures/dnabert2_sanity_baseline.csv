@@ -1,0 +1,17 @@
+task,metric,expected,atol
+gue_promoter_all,classification_accuracy,0.41,0.02
+gue_promoter_all,classification_mcc,-0.1974813097092011,0.02
+gue_promoter_all,classification_auroc,0.390606182256122,0.02
+gue_promoter_all,classification_auprc,0.4175770449988438,0.02
+songlab_clinvar,sequence_embeddings_cosinesim_auroc,0.4266666666666666,0.02
+songlab_clinvar,sequence_embeddings_cosinesim_auprc,0.4080649099248876,0.02
+songlab_clinvar,sequence_embeddings_l2_auroc,0.4622222222222222,0.02
+songlab_clinvar,sequence_embeddings_l2_auprc,0.4237207399615028,0.02
+songlab_clinvar,snv_variant_effect_cosinesim_auroc,0.5624242424242425,0.02
+songlab_clinvar,snv_variant_effect_cosinesim_auprc,0.5237077747861135,0.02
+songlab_clinvar,snv_variant_effect_prediction_masked_llr_auroc,0.5078787878787879,0.02
+songlab_clinvar,snv_variant_effect_prediction_masked_llr_auprc,0.4835891277761123,0.02
+var_bench_coding_pathogenicity,classification_accuracy,0.64,0.02
+var_bench_coding_pathogenicity,classification_mcc,0.279247690968156,0.02
+var_bench_coding_pathogenicity,classification_auroc,0.6690909090909091,0.02
+var_bench_coding_pathogenicity,classification_auprc,0.6019037123132149,0.02
