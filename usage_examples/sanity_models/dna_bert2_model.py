@@ -121,7 +121,7 @@ class DNABERT2Model(BaseGFMModel):
     Paper: Zhou et al. "DNABERT-2: Efficient Foundation Model for Multi-Species Genome"
     """
     
-    def __init__(self, device='cpu', model_name="zhihan1996/DNABERT-2-117M", max_length=512, pretrained=True):
+    def __init__(self, device='cpu', model_name="zhihan1996/DNABERT-2-117M", max_length=512, pretrained=True, use_flash_attention=False):
         """
         Args:
             device: torch device ('cpu' or 'cuda')
@@ -131,12 +131,8 @@ class DNABERT2Model(BaseGFMModel):
                         sequences thanks to ALiBi positional encoding.
             pretrained: bool - if True (default), load pre-trained weights from HuggingFace.
                         If False, initialize model with random weights (for training from scratch).
-        
-        Note:
-            On CUDA devices, DNABERT-2 uses flash attention (via the flash-attn package) 
-            for faster inference. The cached model code has been patched to use the 
-            flash-attn package instead of the original triton implementation.
-            Requires: conda activate sense-env-att
+            use_flash_attention: bool - if False (default), use eager PyTorch attention for
+                        deterministic evaluation. Set True for faster but non-deterministic CUDA runs.
         """
         self.model_name = model_name
         self.device = device
@@ -153,10 +149,23 @@ class DNABERT2Model(BaseGFMModel):
         print(f"Loading DNA-BERT2 model: {model_name} (pretrained={pretrained})")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
         
+        # CRITICAL: Patch flash attention BEFORE model loads
+        # DNABERT-2's bert_layers.py checks FLASH_ATTN_AVAILABLE during model initialization
+        if device == 'cuda' and not use_flash_attention:
+            import sys
+            for module_name, module in list(sys.modules.items()):
+                if 'bert_layers' in module_name and hasattr(module, 'FLASH_ATTN_AVAILABLE'):
+                    module.FLASH_ATTN_AVAILABLE = False
+                    if hasattr(module, 'flash_attn_qkvpacked_func'):
+                        module.flash_attn_qkvpacked_func = None
+                    print(f"  -> Pre-patched {module_name} to disable flash attention")
+                    break
+        
         # Load full MLM model, either pre-trained or from scratch
-        # For CPU, use eager attention implementation to avoid flash_attn
         load_kwargs = {"trust_remote_code": True}
         if device == 'cpu':
+            load_kwargs["attn_implementation"] = "eager"
+        elif not use_flash_attention:
             load_kwargs["attn_implementation"] = "eager"
         
         if pretrained:
@@ -188,18 +197,21 @@ class DNABERT2Model(BaseGFMModel):
         # Track whether MLM head has valid weights (True by default since we load from HuggingFace)
         self.mlm_head_loaded = True
         
-        # Handle flash attention - force disable on CPU
+        # Handle flash attention - patch AFTER model load (for verification and fallback)
         import sys
         attn_module = self.model.encoder.layer[0].attention.self.__class__.__module__
         bert_layers = sys.modules.get(attn_module)
         module_file = bert_layers.__file__ if bert_layers else "unknown"
         
-        # Force disable flash attention on CPU by patching the module
-        # The bert_layers.py checks `if not FLASH_ATTN_AVAILABLE:` to use PyTorch fallback
-        if device == 'cpu' and bert_layers is not None:
-            bert_layers.FLASH_ATTN_AVAILABLE = False
-            bert_layers.flash_attn_qkvpacked_func = None  # Also nullify the function
-            print("  -> Flash attention disabled for CPU")
+        if bert_layers is not None:
+            if device == 'cpu':
+                bert_layers.FLASH_ATTN_AVAILABLE = False
+                bert_layers.flash_attn_qkvpacked_func = None
+                print("  -> Flash attention disabled for CPU (using eager attention)")
+            elif not use_flash_attention:
+                bert_layers.FLASH_ATTN_AVAILABLE = False
+                bert_layers.flash_attn_qkvpacked_func = None
+                print("  -> Flash attention disabled for CUDA (using eager attention)")
         
         flash_available = getattr(bert_layers, 'FLASH_ATTN_AVAILABLE', None) if bert_layers else None
         
@@ -208,7 +220,7 @@ class DNABERT2Model(BaseGFMModel):
         elif flash_available is True:
             attn_type = "✓ FLASH ATTENTION ENABLED"
         elif flash_available is False:
-            attn_type = "PyTorch attention (flash-attn unavailable)"
+            attn_type = "PyTorch attention (flash-attn unavailable/disabled)"
         elif flash_available is None:
             attn_type = "✗ UNPATCHED bert_layers.py - may use triton"
         else:

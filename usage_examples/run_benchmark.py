@@ -16,6 +16,8 @@
 # This module does not embed third-party data download URLs.
 import argparse
 import logging
+import os
+import random
 import sys
 from pathlib import Path
 
@@ -27,6 +29,7 @@ _standalone_root = Path(__file__).parent.parent
 if str(_standalone_root) not in sys.path:
     sys.path.insert(0, str(_standalone_root))
 
+import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
@@ -52,7 +55,7 @@ from gfmbench_api.tasks.concrete.variant_benchmarks_sqtl_task import VariantBenc
 from usage_examples.trainers import GFMFinetuner
 from usage_examples.sanity_models.dna_bert2_model import DNABERT2Model
 from usage_examples.sanity_models.dna_bert_model import DNABERTModel
-from usage_examples.sanity_models.evo2_model import Evo2BioNeMoModel
+# from usage_examples.sanity_models.evo2_model import Evo2BioNeMoModel
 from gfmbench_api.tasks.concrete.brca1_task import BRCA1Task
 from gfmbench_api.tasks.concrete.clinvar_vepeval_task import VepevalClinvarTask
 from gfmbench_api.tasks.concrete.clinvar_indel_task import IndelClinvarTask
@@ -62,7 +65,7 @@ from gfmbench_api.tasks.concrete.loleve_causal_eqtl_task import LoleveCausalEqtl
 MODEL_REGISTRY = {
     "DNABERT2": {"class": DNABERT2Model, "max_length": 2500},
     "DNABERT": {"class": DNABERTModel, "max_length": 500},
-    "Evo2": {"class": Evo2BioNeMoModel, "max_length": 8192},
+    # "Evo2": {"class": Evo2BioNeMoModel, "max_length": 8192},
 }
 
 
@@ -113,6 +116,12 @@ def parse_args():
         help="Number of epochs to fine-tune for supervised tasks (default: 3)"
     )
     parser.add_argument(
+        "--seed",
+        type=int,
+        default=0,
+        help="Random seed for deterministic benchmark evaluation (default: 0)"
+    )
+    parser.add_argument(
         "--disable_safe_model_call",
         action="store_true",
         help="If set, model methods are called directly without try-except wrapper, "
@@ -126,6 +135,31 @@ def parse_args():
         help="Root data directory path. Datasets will be downloaded to this directory"
     )
     return parser.parse_args()
+
+
+def set_seed(seed: int):
+    """Set random seed for reproducibility across all random number generators."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+    try:
+        torch.use_deterministic_algorithms(True, warn_only=False)
+    except AttributeError:
+        try:
+            torch.set_deterministic(True)
+        except AttributeError:
+            pass
+
+    if 'CUBLAS_WORKSPACE_CONFIG' not in os.environ:
+        os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+
+    os.environ['PYTHONHASHSEED'] = str(seed)
 
 
 def load_mlm_head_only(model, mlm_head_path: str):
@@ -179,6 +213,10 @@ def main():
     # Set device
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     logging.info(f"Using device: {device}")
+
+    seed = args.seed
+    set_seed(seed)
+    logging.info(f"Random seed set to: {seed} (deterministic evaluation)")
     
     # =========================================================================
     # Sanity check mode: use minimal data for quick testing
@@ -285,6 +323,9 @@ def main():
         task_attrs = task.get_task_attributes()
         has_finetuning_data = task_attrs.get("has_finetuning_data", False)
 
+        # Re-seed before each task for deterministic model/projection initialization
+        set_seed(seed)
+
         # Reinitialize model for each task to start fresh
         model = ModelClass(device=device, max_length=max_length)
         if checkpoint_path:
@@ -301,10 +342,15 @@ def main():
             is_variant_effect = task_attrs.get("is_variant_effect_prediction", False)
             
             train_dataset = task.get_finetune_dataset()
+
+            generator = torch.Generator()
+            generator.manual_seed(seed)
+
             train_loader = DataLoader(
                 train_dataset, 
                 batch_size=training_params.get("batch_size", 32), 
-                shuffle=True
+                shuffle=True,
+                generator=generator,
             )
             
             finetuner = GFMFinetuner(
