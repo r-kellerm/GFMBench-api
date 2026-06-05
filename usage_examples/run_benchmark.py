@@ -19,7 +19,12 @@ import logging
 import os
 import random
 import sys
+import time
 from pathlib import Path
+
+# Set before torch import for deterministic cuBLAS matmuls (see JEPA-DNA run_benchmark.py)
+if "CUBLAS_WORKSPACE_CONFIG" not in os.environ:
+    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 
 # Ensure we import from the gfmbench_api_rep directory
 # Add the gfmbench_api_rep root to the path if not already there
@@ -134,6 +139,12 @@ def parse_args():
         required=True,
         help="Root data directory path. Datasets will be downloaded to this directory"
     )
+
+    parser.add_argument(
+        "--sanity_check_mode",
+        action="store_true",
+        help="If set, limit each dataset to 100 samples for quick testing.",
+    )
     return parser.parse_args()
 
 
@@ -156,10 +167,21 @@ def set_seed(seed: int):
         except AttributeError:
             pass
 
-    if 'CUBLAS_WORKSPACE_CONFIG' not in os.environ:
-        os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+    if "CUBLAS_WORKSPACE_CONFIG" not in os.environ:
+        os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+    os.environ["PYTHONHASHSEED"] = str(seed)
 
-    os.environ['PYTHONHASHSEED'] = str(seed)
+
+def _format_elapsed(seconds: float) -> str:
+    """Human-readable duration for console logs."""
+    if seconds >= 3600:
+        hours, rem = divmod(int(seconds), 3600)
+        minutes, secs = divmod(rem, 60)
+        return f"{hours}h {minutes}m {secs}s"
+    if seconds >= 60:
+        minutes, secs = divmod(int(seconds), 60)
+        return f"{minutes}m {secs}s"
+    return f"{seconds:.1f}s"
 
 
 def load_mlm_head_only(model, mlm_head_path: str):
@@ -218,11 +240,6 @@ def main():
     set_seed(seed)
     logging.info(f"Random seed set to: {seed} (deterministic evaluation)")
     
-    # =========================================================================
-    # Sanity check mode: use minimal data for quick testing
-    # =========================================================================
-    sanity_check_mode = False  # Set to True for quick testing with 100 samples
-    
     # Path to the root data directory
     root_data_dir_path = args.root_data_dir_path
     
@@ -261,15 +278,16 @@ def main():
     # Set to None for models with no sequence length limit (e.g., HyenaDNA)
     task_config = {
         "max_sequence_length": max_length,
-        "batch_size": 16,
-        "max_num_samples": 256,
+        "batch_size": 32,
+        "max_num_samples": None,
         "disable_safe_model_call": args.disable_safe_model_call,
     }
-    
-    # Apply sanity check mode
-    if sanity_check_mode:
+
+    if args.sanity_check_mode:
         task_config["max_num_samples"] = 100
         logging.info("SANITY CHECK MODE: Limiting to 100 samples per dataset")
+    else:
+        logging.info("Using full datasets (max_num_samples=None)")
 
     # Define all tasks to run
     tasks = [
@@ -302,7 +320,7 @@ def main():
         "optimizer": "AdamW",
         "weight_decay": 0.01,
         "only_proj_layer": args.linear_prob,
-        "batch_size": 8,
+        "batch_size": 32,
     }
 
     logging.info(f"********* Number of tasks: {len(tasks)} *********")
@@ -312,8 +330,11 @@ def main():
     )
     logging.info(f"Fine-tuning epochs: {args.epochs}")
 
+    benchmark_start = time.perf_counter()
+
     # Run each task
     for task in tasks:
+        task_start = time.perf_counter()
         task_name = task.get_task_name()
         logging.info(f"{'='*50}")
         logging.info(f"Running task: {task_name}")
@@ -384,6 +405,18 @@ def main():
         report.add_scores(task_name, report_algo_name, scores)
         report.save_csv()
         logging.info(f"Saved progress to: {csv_path}")
+
+        task_elapsed = time.perf_counter() - task_start
+        logging.info(
+            f"Task '{task_name}' elapsed: {_format_elapsed(task_elapsed)} "
+            f"({task_elapsed:.1f}s)"
+        )
+
+    total_elapsed = time.perf_counter() - benchmark_start
+    logging.info(
+        f"Total benchmark elapsed: {_format_elapsed(total_elapsed)} "
+        f"({total_elapsed:.1f}s)"
+    )
 
     # Print final report
     logging.info(f"{'='*50}")
