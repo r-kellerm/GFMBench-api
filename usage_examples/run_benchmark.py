@@ -134,6 +134,12 @@ def parse_args():
     )
     
     parser.add_argument(
+        "--disable_cache",
+        action="store_true",
+        help="If set, disable inference cache (zero-shot ref cache, supervised VEP ref cache, "
+             "and linear-probing forward cache).",
+    )
+    parser.add_argument(
         '--root_data_dir_path',
         type=str,
         required=True,
@@ -274,14 +280,17 @@ def main():
         load_mlm_head_only(model, mlm_head_path)
     
     # Task configuration for DNABERT-2 (max 512 tokens by default, can extrapolate longer)
-    # Supported keys: max_sequence_length, batch_size, max_num_samples, disable_safe_model_call
+    # Supported keys: max_sequence_length, batch_size, max_num_samples, disable_safe_model_call, disable_cache
     # Set to None for models with no sequence length limit (e.g., HyenaDNA)
     task_config = {
         "max_sequence_length": max_length,
         "batch_size": 32,
         "max_num_samples": None,
         "disable_safe_model_call": args.disable_safe_model_call,
+        "disable_cache": args.disable_cache,
     }
+
+    logging.info(f"disable_cache={args.disable_cache}")
 
     if args.sanity_check_mode:
         task_config["max_num_samples"] = 100
@@ -385,6 +394,7 @@ def main():
                 weight_decay=training_params["weight_decay"],
                 only_proj_layer=training_params["only_proj_layer"],
                 is_variant_effect_prediction=is_variant_effect,
+                disable_cache=args.disable_cache,
                 device=device
             )
             
@@ -400,6 +410,9 @@ def main():
         test_model.eval()
         scores = task.eval_test_set(test_model)
         logging.info(f"Test scores for {task_name}: {scores}")
+
+        if hasattr(test_model, "clear_ref_cache"):
+            test_model.clear_ref_cache()
 
         # Add scores to report and save immediately
         report.add_scores(task_name, report_algo_name, scores)

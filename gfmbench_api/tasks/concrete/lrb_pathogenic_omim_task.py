@@ -124,6 +124,9 @@ class LrbVariantEffectPathogenicOmimTask(BaseGFMZeroShotSNVTask):
     def get_task_name(self) -> str:
         return "lrb_variant_effect_pathogenic_omim"
 
+    def use_reference_cache(self) -> bool:
+        return False
+
     def _get_default_max_seq_len(self) -> int:
         return 1048576
 

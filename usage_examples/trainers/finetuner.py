@@ -18,6 +18,7 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
+from gfmbench_api.utils.caching_utils import SequenceInferenceCache
 from usage_examples.trainers.model_wrapper import GFMWithProjection
 
 
@@ -39,6 +40,7 @@ class GFMFinetuner:
         weight_decay=0.01,
         only_proj_layer=True,
         is_variant_effect_prediction=False,
+        disable_cache=False,
         device='cpu'
     ):
         """
@@ -55,6 +57,7 @@ class GFMFinetuner:
             weight_decay: weight decay for regularization
             only_proj_layer: if True, only train projection layer; if False, train full model
             is_variant_effect_prediction: if True, task uses variant/ref sequence pairs
+            disable_cache: if True, skip frozen backbone forward cache during linear probing
             device: torch device
         """
         self.model = model
@@ -67,6 +70,7 @@ class GFMFinetuner:
         self.weight_decay = weight_decay
         self.only_proj_layer = only_proj_layer
         self.is_variant_effect_prediction = is_variant_effect_prediction
+        self.disable_cache = disable_cache
         self.device = device
         
         # Create projection layer for classification
@@ -121,7 +125,9 @@ class GFMFinetuner:
         else:
             self.model.eval()  # Keep model in eval mode if only training projection
         self.projection.train()
-        
+
+        fwd_cache = SequenceInferenceCache() if self.only_proj_layer else None
+
         # Training loop
         for epoch in range(self.num_epochs):
             total_loss = 0.0
@@ -138,8 +144,16 @@ class GFMFinetuner:
                     # Use no_grad when only training projection layer (saves memory/compute)
                     if self.only_proj_layer:
                         with torch.no_grad():
-                            var_repr = self.model._sequence_to_representative(variant_sequences)
-                            ref_repr = self.model._sequence_to_representative(ref_sequences)
+                            var_repr = fwd_cache.cached_call(
+                                self.model._sequence_to_representative,
+                                variant_sequences,
+                                disable=self.disable_cache,
+                            )
+                            ref_repr = fwd_cache.cached_call(
+                                self.model._sequence_to_representative,
+                                ref_sequences,
+                                disable=self.disable_cache,
+                            )
                         # Detach to ensure no gradient flow to model
                         var_repr = var_repr.detach()
                         ref_repr = ref_repr.detach()
@@ -158,7 +172,11 @@ class GFMFinetuner:
                     # Use no_grad when only training projection layer (saves memory/compute)
                     if self.only_proj_layer:
                         with torch.no_grad():
-                            sequence_repr = self.model._sequence_to_representative(sequences)
+                            sequence_repr = fwd_cache.cached_call(
+                                self.model._sequence_to_representative,
+                                sequences,
+                                disable=self.disable_cache,
+                            )
                         # Detach to ensure no gradient flow to model
                         sequence_repr = sequence_repr.detach()
                     else:
@@ -179,14 +197,19 @@ class GFMFinetuner:
                 
                 # Update progress bar with average loss
                 progress_bar.set_postfix({'avg_loss': f'{avg_loss:.4f}'})
-        
+
+        if fwd_cache is not None:
+            fwd_cache.clear()
+
         if self.num_epochs > 0:
             print(f"Fine-tuning completed. Final average loss: {avg_loss:.4f}")
         else:
             print("Fine-tuning skipped")
         
         # Return wrapped model with projection layer
-        wrapped_model = GFMWithProjection(self.model, self.projection)
+        wrapped_model = GFMWithProjection(
+            self.model, self.projection, disable_cache=self.disable_cache
+        )
         wrapped_model.eval()  # Set to eval mode after training
         return wrapped_model
 

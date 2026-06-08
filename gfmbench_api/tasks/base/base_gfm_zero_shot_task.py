@@ -15,6 +15,7 @@
 
 # This module does not embed third-party data download URLs.
 from abc import abstractmethod
+from functools import partial
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -30,6 +31,7 @@ from gfmbench_api.metrics import (
     SumProbsLLRAUROC
 )
 from gfmbench_api.tasks.base.base_gfm_task import BaseGFMTask
+from gfmbench_api.utils.caching_utils import SequenceInferenceCache
 
 
 class BaseGFMZeroShotTask(BaseGFMTask):
@@ -47,6 +49,7 @@ class BaseGFMZeroShotTask(BaseGFMTask):
         - get_task_name(): Return task name
         - _get_default_max_seq_len(): Return default max sequence length
         - get_conditional_input_meta_data_frame(): Return metadata schema or None
+        - use_reference_cache(): Return whether to cache reference infer_sequence_to_sequence calls
     """
     
     def __init__(self, root_data_dir_path: str,
@@ -114,18 +117,25 @@ class BaseGFMZeroShotTask(BaseGFMTask):
         # Get additional metrics from subclass
         additional_metrics = self._get_additional_metrics()
 
+        ref_cache = SequenceInferenceCache()
         for batch_data in tqdm(data_loader, desc="Evaluating (Zero-Shot)"):
             variant_sequences, reference_sequences, labels, conditional_input = batch_data
-            
+
             # Get sequence-to-sequence outputs for both variant and reference
             # Returns: (sequence_probs, sequence_embeddings, sequence_representative)
             variant_probs_np, variant_embeddings_np, variant_repr_np = self._safe_model_call(
                 model, 'infer_sequence_to_sequence', variant_sequences, conditional_input, num_outputs=3
             )
-            reference_probs_np, reference_embeddings_np, reference_repr_np = self._safe_model_call(
-                model, 'infer_sequence_to_sequence', reference_sequences, conditional_input, num_outputs=3
+            infer_ref = partial(
+                self._safe_model_call, model, 'infer_sequence_to_sequence', num_outputs=3
             )
-            
+            reference_probs_np, reference_embeddings_np, reference_repr_np = ref_cache.cached_call(
+                infer_ref,
+                reference_sequences,
+                conditional_input,
+                disable=self.disable_cache or not self.use_reference_cache(),
+            )
+
             # Build outputs dict for metric argument lookup
             outputs = {
                 'variant_probs': variant_probs_np,
@@ -136,18 +146,20 @@ class BaseGFMZeroShotTask(BaseGFMTask):
                 'reference_repr': reference_repr_np,
                 'labels': labels,
             }
-            
+
             # Update common metrics using their specified argument keys
             for metric, arg_keys in common_metrics:
                 args = [outputs[key] for key in arg_keys]
                 metric.calc(*args)
-            
+
             # Update additional metrics (subclass handles this)
             self._update_additional_metrics(
-                additional_metrics, model, 
+                additional_metrics, model,
                 variant_sequences, reference_sequences, labels,
                 outputs
             )
+
+        ref_cache.clear()
 
         # Aggregate results from all metrics
         results = {}
@@ -157,6 +169,11 @@ class BaseGFMZeroShotTask(BaseGFMTask):
             results[metric.name] = metric.get_final_results()
         
         return results
+
+    @abstractmethod
+    def use_reference_cache(self) -> bool:
+        """Return True to cache reference infer_sequence_to_sequence calls during eval."""
+        pass
 
     @abstractmethod
     def _get_additional_metrics(self) -> List[tuple]:

@@ -38,6 +38,8 @@ class BaseGFMTask(ABC):
                          - "max_num_samples": int or None - maximum number of samples to load per dataset.
                            If provided, datasets will be limited to min(max_num_samples, original_size).
                            If None or not provided, all samples are loaded.
+                         - "disable_cache": bool - disable inference caching (default: False).
+                           Used by zero-shot tasks together with use_reference_cache().
         """
         self.root_data_dir_path: str = root_data_dir_path
         self.task_config: Optional[Dict[str, Any]] = task_config or {}
@@ -50,6 +52,9 @@ class BaseGFMTask(ABC):
         
         # Extract disable_safe_model_call from task_config (default: False)
         self.disable_safe_model_call: bool = self.task_config.get("disable_safe_model_call", False)
+
+        # Extract disable_cache from task_config (default: False)
+        self.disable_cache: bool = self.task_config.get("disable_cache", False)
         
         # Compute effective max_sequence_length
         self.max_sequence_length: int = self._get_max_sequence_length()
