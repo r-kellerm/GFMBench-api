@@ -217,10 +217,9 @@ def main():
         raise ValueError(f"Unknown model: {args.model}. Supported models: {list(MODEL_REGISTRY.keys())}")
     if args.model == "Evo2" and not args.linear_prob:
         raise ValueError("Evo2 does not support full fine-tuning. Use --linear_prob for Evo2 benchmarks.")
-    model_entry = MODEL_REGISTRY[args.model]
-    ModelClass = model_entry["class"]
-    max_length = model_entry["max_length"]
-    model_init_kwargs = model_entry.get("model_kwargs", {})
+    ModelClass = MODEL_REGISTRY[args.model]["class"]
+    max_length = MODEL_REGISTRY[args.model]["max_length"]
+    model_init_kwargs = MODEL_REGISTRY[args.model].get("model_kwargs", {})
     
     logging.info(f"Model: {args.model}, Max sequence length: {max_length}")
     
@@ -248,26 +247,26 @@ def main():
 
     # Define all tasks to run
     tasks = [
-        # VepevalClinvarTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        # IndelClinvarTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        # LoleveCausalEqtlTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        VepevalClinvarTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        IndelClinvarTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        LoleveCausalEqtlTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
         BRCA1Task(root_data_dir_path=root_data_dir_path, task_config=task_config),
         GueTranscriptionFactorTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        # GuePromoterAllTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        # GueSpliceSiteTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        # BendVEPExpression(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        # BendVEPDisease(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        # SonglabClinvarTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        # VariantBenchmarksCodingTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        # VariantBenchmarksNonCodingTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        # VariantBenchmarksExpressionTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        # VariantBenchmarksCommonVsRareTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        # VariantBenchmarksMEQTLTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        # VariantBenchmarksSQTLTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        # TraitGymComplexTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        # TraitGymMendelianTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        # LrbVariantEffectPathogenicOmimTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        # LRBCausalEqtlTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        GuePromoterAllTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        GueSpliceSiteTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        BendVEPExpression(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        BendVEPDisease(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        SonglabClinvarTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        VariantBenchmarksCodingTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        VariantBenchmarksNonCodingTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        VariantBenchmarksExpressionTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        VariantBenchmarksCommonVsRareTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        VariantBenchmarksMEQTLTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        VariantBenchmarksSQTLTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        TraitGymComplexTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        TraitGymMendelianTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        LrbVariantEffectPathogenicOmimTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        LRBCausalEqtlTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
     ]
 
     # Training parameters for fine-tuning tasks
