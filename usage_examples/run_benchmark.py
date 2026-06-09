@@ -22,7 +22,7 @@ import sys
 import time
 from pathlib import Path
 
-# Set before torch import for deterministic cuBLAS matmuls (see JEPA-DNA run_benchmark.py)
+# Set before torch import for deterministic cuBLAS matmuls
 if "CUBLAS_WORKSPACE_CONFIG" not in os.environ:
     os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 # Safe with DataLoader num_workers > 0 after HuggingFace tokenizers are used in the main process
@@ -62,7 +62,7 @@ from gfmbench_api.tasks.concrete.variant_benchmarks_sqtl_task import VariantBenc
 from usage_examples.trainers import GFMFinetuner
 from usage_examples.sanity_models.dna_bert2_model import DNABERT2Model
 from usage_examples.sanity_models.dna_bert_model import DNABERTModel
-# from usage_examples.sanity_models.evo2_model import Evo2BioNeMoModel
+from usage_examples.sanity_models.evo2_model import Evo2BioNeMoModel
 from gfmbench_api.tasks.concrete.brca1_task import BRCA1Task
 from gfmbench_api.tasks.concrete.clinvar_vepeval_task import VepevalClinvarTask
 from gfmbench_api.tasks.concrete.clinvar_indel_task import IndelClinvarTask
@@ -72,7 +72,7 @@ from gfmbench_api.tasks.concrete.loleve_causal_eqtl_task import LoleveCausalEqtl
 MODEL_REGISTRY = {
     "DNABERT2": {"class": DNABERT2Model, "max_length": 2500},
     "DNABERT": {"class": DNABERTModel, "max_length": 500},
-    # "Evo2": {"class": Evo2BioNeMoModel, "max_length": 8192},
+    "Evo2": {"class": Evo2BioNeMoModel, "max_length": 8192},
 }
 
 
@@ -175,8 +175,6 @@ def set_seed(seed: int):
         except AttributeError:
             pass
 
-    if "CUBLAS_WORKSPACE_CONFIG" not in os.environ:
-        os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
     os.environ["PYTHONHASHSEED"] = str(seed)
 
 

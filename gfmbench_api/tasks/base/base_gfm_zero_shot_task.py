@@ -174,7 +174,11 @@ class BaseGFMZeroShotTask(BaseGFMTask):
 
     @abstractmethod
     def use_reference_cache(self) -> bool:
-        """Return True to cache reference infer_sequence_to_sequence calls during eval."""
+        """Return True to cache reference infer_sequence_to_sequence calls during eval.
+
+        Disable when reference sequences rarely repeat (low cache hit rate); caching
+        then adds lookup overhead without saving inference work.
+        """
         pass
 
     @abstractmethod

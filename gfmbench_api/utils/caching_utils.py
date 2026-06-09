@@ -16,11 +16,7 @@
 from typing import Any, Callable, Hashable, List, Optional, Sequence, Tuple
 
 import numpy as np
-
-try:
-    import torch
-except ImportError:
-    torch = None  # type: ignore
+import torch
 
 # OutputSpec tags cached return types so hits can be restored to the caller format.
 # ("none",) | ("numpy", dtype) | ("torch", device, dtype) | ("list",) | ("raw",)
