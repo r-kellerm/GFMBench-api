@@ -161,6 +161,9 @@ class TraitGymComplexTask(BaseGFMZeroShotSNVTask):
         """Return task name (used for data directory)."""
         return "traitgym_complex"
 
+    def use_reference_cache(self) -> bool:
+        return False
+
     def _create_test_dataset(self) -> Dataset:
         """
         Create test dataset from TraitGym HuggingFace dataset.

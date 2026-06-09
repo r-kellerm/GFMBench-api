@@ -68,6 +68,9 @@ class VepevalClinvarTask(BaseGFMZeroShotSNVTask):
     def get_task_name(self) -> str:
         return "vepeval_clinvar"
 
+    def use_reference_cache(self) -> bool:
+        return True
+
     def _create_test_dataset(self):
         """
         Create test dataset from ClinVar VEP-eval benchmark.

@@ -35,21 +35,30 @@ class BaseGFMTask(ABC):
                          - "max_sequence_length": int or None - maximum sequence length for the model.
                            If provided, sequences will be truncated to min(task_default, max_sequence_length).
                          - "batch_size": int - batch size for dataloaders (default: 32).
+                         - "num_workers": int - DataLoader worker processes (default: 0).
                          - "max_num_samples": int or None - maximum number of samples to load per dataset.
                            If provided, datasets will be limited to min(max_num_samples, original_size).
                            If None or not provided, all samples are loaded.
+                         - "disable_cache": bool - disable inference caching (default: False).
+                           Used by zero-shot tasks together with use_reference_cache().
         """
         self.root_data_dir_path: str = root_data_dir_path
         self.task_config: Optional[Dict[str, Any]] = task_config or {}
         
         # Extract batch_size from task_config (default: 32)
         self.batch_size: int = self.task_config.get("batch_size", 32)
+
+        # Extract num_workers from task_config (default: 0)
+        self.num_workers: int = self.task_config.get("num_workers", 0)
         
         # Extract max_num_samples from task_config (default: None = use all samples)
         self.max_num_samples: Optional[int] = self.task_config.get("max_num_samples", None)
         
         # Extract disable_safe_model_call from task_config (default: False)
         self.disable_safe_model_call: bool = self.task_config.get("disable_safe_model_call", False)
+
+        # Extract disable_cache from task_config (default: False)
+        self.disable_cache: bool = self.task_config.get("disable_cache", False)
         
         # Compute effective max_sequence_length
         self.max_sequence_length: int = self._get_max_sequence_length()

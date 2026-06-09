@@ -263,6 +263,9 @@ class LoleveCausalEqtlTask(BaseGFMZeroShotGeneralIndelTask):
     def get_task_name(self) -> str:
         return "loleve_causal_eqtl"
 
+    def use_reference_cache(self) -> bool:
+        return True
+
     def _get_default_max_seq_len(self) -> int:
         # framework should pass max_sequence_length; keep a safe default here
         return 131072

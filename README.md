@@ -60,7 +60,7 @@ gfmbench_api_rep/
 │   ├── tasks/                 # Task definitions
 │   │   ├── base/              # Base task/model classes
 │   │   └── concrete/          # 20+ ready-to-use tasks
-│   └── utils/                 # Misc utilities (data I/O, download helpers)
+│   └── utils/                 # Misc utilities (data I/O, download helpers, inference cache)
 ├── usage_examples/            # Getting started scripts and toy models
 │   ├── run_benchmark.py
 │   ├── trainers/
@@ -104,6 +104,8 @@ GFMBench-API supports evaluation on **20 unique tasks**, grouped as:
 | TraitGymMendelianTask             | Zero-shot prediction of Mendelian disease-associated variants. |
 | LrbVariantEffectPathogenicOmimTask   | Zero-shot prediction of pathogenic variants associated with Mendelian diseases. |
 | LoleveCausalEqtlTask                 | Zero-shot prediction of causal expression-modulating variants (indels) in promoters. |
+
+Several zero-shot variant effect prediction tasks repeat the same reference sequence across variants. For tasks where that pattern is common, reference sequences are cached during evaluation to avoid redundant forward passes and improve efficiency. Caching is applied only where it offers a meaningful memory and latency tradeoff. To disable caching (e.g. due to memory limits), set `"disable_cache": True` in `task_config`.
 
 ---
 
@@ -172,9 +174,10 @@ This reference script demonstrates a standard workflow:
   sanity_check_mode = True  # Set to False for full eval
   ```
 - **Task configuration**  
-  Edit parameters like `max_sequence_length`, `batch_size`.
+  Edit parameters like `max_sequence_length`, `batch_size`, or `disable_cache`.
 - **Training parameters**  
   Change `num_epochs`, `learning_rate`, etc. in the training_params dict.
+- **Reproducibility:** Using `num_workers > 0` may cause non-deterministic results on several tasks; for full reproducibility in `usage_examples/run_benchmark.py`, keep the default `num_workers = 0`.
 - **Task list**  
   Edit/add the tasks in the `tasks = [...]` list.
 - **Model registry**  
@@ -208,6 +211,26 @@ python usage_examples/run_benchmark.py \
     --report_algo_name linear_probe \
     --csv_path results/linear_probe_results.csv
 ```
+
+Disable inference cache (e.g. memory limits):  
+```bash
+python usage_examples/run_benchmark.py \
+    --model DNABERT2 \
+    --disable_cache \
+    --report_algo_name no_cache \
+    --csv_path results/no_cache_results.csv
+```
+
+#### Inference caching
+
+Selected zero-shot variant effect prediction tasks cache repeated reference sequences during evaluation (see above). Set `"disable_cache": True` in `task_config` to turn this off.
+
+On top of that, `usage_examples/run_benchmark.py` uses the same caching utility (`gfmbench_api/utils/caching_utils.py`) in two other places:
+
+- **Linear probing (`--linear_prob`):** caches frozen backbone forwards when only the projection layer is trained.
+- **Supervised variant effect prediction:** caches reference sequences during evaluation.
+
+Caches are cleared after each task. Pass `--disable_cache` to disable all caching.
 
 ---
 
@@ -357,6 +380,9 @@ Additional methods for supervised tasks:
 
 5. **`_get_num_labels() -> int`**: Return the number of classification labels
 
+Additional methods for zero-shot tasks:
+
+5. **`use_reference_cache() -> bool`**: Return `True` if repeated reference sequences make eval-time caching worthwhile; otherwise `False`.
 ### Example: Supervised Single-Sequence Task
 
 ```python
@@ -425,6 +451,9 @@ class MyZeroShotTask(BaseGFMZeroShotSNVTask):
     
     def get_conditional_input_meta_data_frame(self):
         return None
+
+    def use_reference_cache(self) -> bool:
+        return True  # Set False if references are mostly unique per variant
 ```
 
 

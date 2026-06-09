@@ -16,8 +16,17 @@
 # This module does not embed third-party data download URLs.
 import argparse
 import logging
+import os
+import random
 import sys
+import time
 from pathlib import Path
+
+# Set before torch import for deterministic cuBLAS matmuls
+if "CUBLAS_WORKSPACE_CONFIG" not in os.environ:
+    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+# Safe with DataLoader num_workers > 0 after HuggingFace tokenizers are used in the main process
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
 # Ensure we import from the gfmbench_api_rep directory
 # Add the gfmbench_api_rep root to the path if not already there
@@ -27,6 +36,7 @@ _standalone_root = Path(__file__).parent.parent
 if str(_standalone_root) not in sys.path:
     sys.path.insert(0, str(_standalone_root))
 
+import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
@@ -113,6 +123,12 @@ def parse_args():
         help="Number of epochs to fine-tune for supervised tasks (default: 3)"
     )
     parser.add_argument(
+        "--seed",
+        type=int,
+        default=0,
+        help="Random seed for deterministic benchmark evaluation (default: 0)"
+    )
+    parser.add_argument(
         "--disable_safe_model_call",
         action="store_true",
         help="If set, model methods are called directly without try-except wrapper, "
@@ -120,12 +136,58 @@ def parse_args():
     )
     
     parser.add_argument(
+        "--disable_cache",
+        action="store_true",
+        help="If set, disable inference cache (zero-shot ref cache, supervised VEP ref cache, "
+             "and linear-probing forward cache).",
+    )
+    parser.add_argument(
         '--root_data_dir_path',
         type=str,
         required=True,
         help="Root data directory path. Datasets will be downloaded to this directory"
     )
+
+    parser.add_argument(
+        "--sanity_check_mode",
+        action="store_true",
+        help="If set, limit each dataset to 100 samples for quick testing.",
+    )
     return parser.parse_args()
+
+
+def set_seed(seed: int):
+    """Set random seed for reproducibility across all random number generators."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+    try:
+        torch.use_deterministic_algorithms(True, warn_only=False)
+    except AttributeError:
+        try:
+            torch.set_deterministic(True)
+        except AttributeError:
+            pass
+
+    os.environ["PYTHONHASHSEED"] = str(seed)
+
+
+def _format_elapsed(seconds: float) -> str:
+    """Human-readable duration for console logs."""
+    if seconds >= 3600:
+        hours, rem = divmod(int(seconds), 3600)
+        minutes, secs = divmod(rem, 60)
+        return f"{hours}h {minutes}m {secs}s"
+    if seconds >= 60:
+        minutes, secs = divmod(int(seconds), 60)
+        return f"{minutes}m {secs}s"
+    return f"{seconds:.1f}s"
 
 
 def load_mlm_head_only(model, mlm_head_path: str):
@@ -179,11 +241,10 @@ def main():
     # Set device
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     logging.info(f"Using device: {device}")
-    
-    # =========================================================================
-    # Sanity check mode: use minimal data for quick testing
-    # =========================================================================
-    sanity_check_mode = False  # Set to True for quick testing with 100 samples
+
+    seed = args.seed
+    set_seed(seed)
+    logging.info(f"Random seed set to: {seed} (deterministic evaluation)")
     
     # Path to the root data directory
     root_data_dir_path = args.root_data_dir_path
@@ -219,19 +280,24 @@ def main():
         load_mlm_head_only(model, mlm_head_path)
     
     # Task configuration for DNABERT-2 (max 512 tokens by default, can extrapolate longer)
-    # Supported keys: max_sequence_length, batch_size, max_num_samples, disable_safe_model_call
+    # Supported keys: max_sequence_length, batch_size, num_workers, max_num_samples, disable_safe_model_call, disable_cache
     # Set to None for models with no sequence length limit (e.g., HyenaDNA)
     task_config = {
         "max_sequence_length": max_length,
-        "batch_size": 16,
-        "max_num_samples": 256,
+        "batch_size": 32,
+        "num_workers": 0,
+        "max_num_samples": None,
         "disable_safe_model_call": args.disable_safe_model_call,
+        "disable_cache": args.disable_cache,
     }
-    
-    # Apply sanity check mode
-    if sanity_check_mode:
+
+    logging.info(f"disable_cache={args.disable_cache}")
+
+    if args.sanity_check_mode:
         task_config["max_num_samples"] = 100
         logging.info("SANITY CHECK MODE: Limiting to 100 samples per dataset")
+    else:
+        logging.info("Using full datasets (max_num_samples=None)")
 
     # Define all tasks to run
     tasks = [
@@ -264,7 +330,8 @@ def main():
         "optimizer": "AdamW",
         "weight_decay": 0.01,
         "only_proj_layer": args.linear_prob,
-        "batch_size": 8,
+        "batch_size": 32,
+        "num_workers": 0,
     }
 
     logging.info(f"********* Number of tasks: {len(tasks)} *********")
@@ -274,8 +341,11 @@ def main():
     )
     logging.info(f"Fine-tuning epochs: {args.epochs}")
 
+    benchmark_start = time.perf_counter()
+
     # Run each task
     for task in tasks:
+        task_start = time.perf_counter()
         task_name = task.get_task_name()
         logging.info(f"{'='*50}")
         logging.info(f"Running task: {task_name}")
@@ -284,6 +354,9 @@ def main():
         # Get task attributes
         task_attrs = task.get_task_attributes()
         has_finetuning_data = task_attrs.get("has_finetuning_data", False)
+
+        # Re-seed before each task for deterministic model/projection initialization
+        set_seed(seed)
 
         # Reinitialize model for each task to start fresh
         model = ModelClass(device=device, max_length=max_length)
@@ -301,10 +374,16 @@ def main():
             is_variant_effect = task_attrs.get("is_variant_effect_prediction", False)
             
             train_dataset = task.get_finetune_dataset()
+
+            generator = torch.Generator()
+            generator.manual_seed(seed)
+
             train_loader = DataLoader(
-                train_dataset, 
-                batch_size=training_params.get("batch_size", 32), 
-                shuffle=True
+                train_dataset,
+                batch_size=training_params["batch_size"],
+                shuffle=True,
+                num_workers=training_params["num_workers"],
+                generator=generator,
             )
             
             finetuner = GFMFinetuner(
@@ -318,6 +397,7 @@ def main():
                 weight_decay=training_params["weight_decay"],
                 only_proj_layer=training_params["only_proj_layer"],
                 is_variant_effect_prediction=is_variant_effect,
+                disable_cache=args.disable_cache,
                 device=device
             )
             
@@ -334,10 +414,25 @@ def main():
         scores = task.eval_test_set(test_model)
         logging.info(f"Test scores for {task_name}: {scores}")
 
+        if hasattr(test_model, "clear_ref_cache"):
+            test_model.clear_ref_cache()
+
         # Add scores to report and save immediately
         report.add_scores(task_name, report_algo_name, scores)
         report.save_csv()
         logging.info(f"Saved progress to: {csv_path}")
+
+        task_elapsed = time.perf_counter() - task_start
+        logging.info(
+            f"Task '{task_name}' elapsed: {_format_elapsed(task_elapsed)} "
+            f"({task_elapsed:.1f}s)"
+        )
+
+    total_elapsed = time.perf_counter() - benchmark_start
+    logging.info(
+        f"Total benchmark elapsed: {_format_elapsed(total_elapsed)} "
+        f"({total_elapsed:.1f}s)"
+    )
 
     # Print final report
     logging.info(f"{'='*50}")

@@ -63,7 +63,10 @@ class BRCA1Task(BaseGFMZeroShotSNVTask):
         return 1048576
     
     def get_task_name(self):
-        return "brca1" 
+        return "brca1"
+
+    def use_reference_cache(self) -> bool:
+        return True
 
     def _create_test_dataset(self):
         try:
