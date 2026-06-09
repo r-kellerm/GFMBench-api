@@ -36,8 +36,3 @@ include = ["gfmbench_api*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-markers = [
-    "smoke: E2E smoke tests (mock model, local fixtures)",
-    "download: E2E download tests (network, empty data directory)",
-    "heavy: full regression with real models and downloads",
-]

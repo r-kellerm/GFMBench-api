@@ -1,10 +1,23 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """E2E smoke tests: task → mock model → metrics → (optional) CSV report."""
 
 from __future__ import annotations
 
 import types
-
-import pytest
 
 from gfmbench_api.benchmark_report import BenchmarkReport
 from gfmbench_api.tasks.concrete.gue_promoter_all_task import GuePromoterAllTask
@@ -14,8 +27,6 @@ from tests.e2e.fixture_tasks import (
     FixtureZeroShotIndelTask,
     FixtureZeroShotSNVTask,
 )
-
-pytestmark = pytest.mark.smoke
 
 CLASSIFICATION_METRICS = {
     "classification_accuracy",

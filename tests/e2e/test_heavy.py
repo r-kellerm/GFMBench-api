@@ -1,17 +1,30 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 Heavy E2E regression: run DNABERT2 on 3 tasks, compare to baseline.
 
-Requires:
-  RUN_HEAVY_TESTS=1
-  GFMBENCH_DATA_ROOT=<path to benchmark datasets>
+Regression (included in ``pytest tests/``):
+  pytest tests/e2e/test_heavy.py::test_heavy_sanity_regression
 
-Regenerate baseline:
-  RUN_HEAVY_TESTS=1 UPDATE_HEAVY_BASELINE=1 pytest tests/e2e/test_heavy.py -m heavy -s
+Refresh pinned baseline (run explicitly by name):
+  pytest tests/e2e/test_heavy.py::test_heavy_update_baseline -s
 """
 
 from __future__ import annotations
 
-import os
 import re
 from pathlib import Path
 
@@ -31,8 +44,6 @@ from usage_examples.benchmark_runner import (
     run_benchmark,
 )
 
-pytestmark = pytest.mark.heavy
-
 DEFAULT_ATOL = 0.02
 
 
@@ -45,23 +56,16 @@ def _baseline_path(model_name: str) -> Path:
     )
 
 
-def _heavy_env_ready() -> tuple[bool, str]:
-    if os.environ.get("RUN_HEAVY_TESTS") != "1":
-        return False, "Set RUN_HEAVY_TESTS=1 to enable heavy regression tests"
-    data_root = os.environ.get("GFMBENCH_DATA_ROOT")
-    if not data_root or not Path(data_root).is_dir():
-        return False, "Set GFMBENCH_DATA_ROOT to an existing data directory"
-    return True, ""
+@pytest.fixture(scope="module")
+def heavy_data_root(tmp_path_factory) -> Path:
+    """Shared data directory; task init downloads datasets as needed."""
+    return tmp_path_factory.mktemp("heavy_data")
 
 
 @pytest.fixture
-def heavy_config(tmp_path) -> BenchmarkConfig:
-    ready, reason = _heavy_env_ready()
-    if not ready:
-        pytest.skip(reason)
-
+def heavy_config(heavy_data_root, tmp_path) -> BenchmarkConfig:
     return BenchmarkConfig(
-        root_data_dir_path=os.environ["GFMBENCH_DATA_ROOT"],
+        root_data_dir_path=str(heavy_data_root),
         csv_path=str(tmp_path / "heavy_results.csv"),
         report_algo_name=f"{DEFAULT_HEAVY_MODEL.lower()}_heavy",
         model_name=DEFAULT_HEAVY_MODEL,
@@ -75,36 +79,41 @@ def heavy_config(tmp_path) -> BenchmarkConfig:
     )
 
 
+def _run_heavy_benchmark(config: BenchmarkConfig) -> pd.DataFrame:
+    run_benchmark(config)
+    return load_results(Path(config.csv_path))
+
+
+def _write_baseline(results_df: pd.DataFrame, baseline_path: Path) -> None:
+    baseline_rows = []
+    for _, row in results_df.iterrows():
+        if pd.isna(row["actual"]):
+            continue
+        baseline_rows.append(
+            {
+                "task": row["task"],
+                "metric": row["metric"],
+                "expected": row["actual"],
+                "atol": DEFAULT_ATOL,
+            }
+        )
+    baseline_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(baseline_rows).to_csv(baseline_path, index=False)
+
+
 def test_heavy_sanity_regression(heavy_config):
+    """Run DNABERT2 on 3 tasks and compare scores to the pinned baseline CSV."""
     model_name = heavy_config.model_name
     baseline_path = _baseline_path(model_name)
-
-    run_benchmark(heavy_config)
-    results_df = load_results(Path(heavy_config.csv_path))
-
-    if os.environ.get("UPDATE_HEAVY_BASELINE") == "1":
-        baseline_rows = []
-        for _, row in results_df.iterrows():
-            if pd.isna(row["actual"]):
-                continue
-            baseline_rows.append(
-                {
-                    "task": row["task"],
-                    "metric": row["metric"],
-                    "expected": row["actual"],
-                    "atol": DEFAULT_ATOL,
-                }
-            )
-        baseline_path.parent.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame(baseline_rows).to_csv(baseline_path, index=False)
-        pytest.skip(f"Wrote updated baseline to {baseline_path}")
 
     if not baseline_path.is_file():
         pytest.fail(
             f"Missing baseline {baseline_path}. "
-            "Run once with UPDATE_HEAVY_BASELINE=1 to create it."
+            "Create it with: "
+            "pytest tests/e2e/test_heavy.py::test_heavy_update_baseline -s"
         )
 
+    results_df = _run_heavy_benchmark(heavy_config)
     baseline_df = load_baseline(baseline_path)
     failures, warnings = compare_to_baseline(
         results_df,
@@ -116,3 +125,11 @@ def test_heavy_sanity_regression(heavy_config):
         print("\n".join(warnings))
 
     assert not failures, "Metric drift vs baseline:\n" + format_failures(failures)
+
+
+def test_heavy_update_baseline(heavy_config):
+    """Run DNABERT2 on 3 tasks and write scores to the pinned baseline CSV."""
+    baseline_path = _baseline_path(heavy_config.model_name)
+    results_df = _run_heavy_benchmark(heavy_config)
+    _write_baseline(results_df, baseline_path)
+    print(f"Wrote updated baseline to {baseline_path}")
