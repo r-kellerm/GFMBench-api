@@ -52,7 +52,8 @@ from gfmbench_api.tasks.concrete.variant_benchmarks_sqtl_task import VariantBenc
 from usage_examples.trainers import GFMFinetuner
 from usage_examples.sanity_models.dna_bert2_model import DNABERT2Model
 from usage_examples.sanity_models.dna_bert_model import DNABERTModel
-from usage_examples.sanity_models.evo2_model import Evo2BioNeMoModel
+# from usage_examples.sanity_models.evo2_model import Evo2BioNeMoModel
+from usage_examples.sanity_models.ntv3_model import NucleotideTransformerV3Model
 from gfmbench_api.tasks.concrete.brca1_task import BRCA1Task
 from gfmbench_api.tasks.concrete.clinvar_vepeval_task import VepevalClinvarTask
 from gfmbench_api.tasks.concrete.clinvar_indel_task import IndelClinvarTask
@@ -62,7 +63,17 @@ from gfmbench_api.tasks.concrete.loleve_causal_eqtl_task import LoleveCausalEqtl
 MODEL_REGISTRY = {
     "DNABERT2": {"class": DNABERT2Model, "max_length": 2500},
     "DNABERT": {"class": DNABERTModel, "max_length": 500},
-    "Evo2": {"class": Evo2BioNeMoModel, "max_length": 8192},
+    # "Evo2": {"class": Evo2BioNeMoModel, "max_length": 8192},
+    "NTv3_8M": {
+        "class": NucleotideTransformerV3Model,
+        "max_length": 8192,
+        "model_kwargs": {"model_name": "NTv3_8M_pre", "use_autocast": False},
+    },
+    "NTv3_100M": {
+        "class": NucleotideTransformerV3Model,
+        "max_length": 8192,
+        "model_kwargs": {"model_name": "NTv3_100M_pre", "use_autocast": True},
+    },
 }
 
 
@@ -104,7 +115,7 @@ def parse_args():
         "--model",
         type=str,
         default="DNABERT2",
-        help="Model to use for benchmarking. Supported: DNABERT2, DNABERT"
+        help="Model to use for benchmarking. Supported: DNABERT2, DNABERT, Evo2, NTv3_8M, NTv3_100M"
     )
     parser.add_argument(
         "--epochs",
@@ -206,13 +217,15 @@ def main():
         raise ValueError(f"Unknown model: {args.model}. Supported models: {list(MODEL_REGISTRY.keys())}")
     if args.model == "Evo2" and not args.linear_prob:
         raise ValueError("Evo2 does not support full fine-tuning. Use --linear_prob for Evo2 benchmarks.")
-    ModelClass = MODEL_REGISTRY[args.model]["class"]
-    max_length = MODEL_REGISTRY[args.model]["max_length"]
+    model_entry = MODEL_REGISTRY[args.model]
+    ModelClass = model_entry["class"]
+    max_length = model_entry["max_length"]
+    model_init_kwargs = model_entry.get("model_kwargs", {})
     
     logging.info(f"Model: {args.model}, Max sequence length: {max_length}")
     
     # Initialize model (will be reinitialized per task)
-    model = ModelClass(device=device, max_length=max_length)
+    model = ModelClass(device=device, max_length=max_length, **model_init_kwargs)
     if checkpoint_path:
         model.load_checkpoint(checkpoint_path)
     if mlm_head_path:
@@ -235,26 +248,26 @@ def main():
 
     # Define all tasks to run
     tasks = [
-        VepevalClinvarTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        IndelClinvarTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        LoleveCausalEqtlTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        # VepevalClinvarTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        # IndelClinvarTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        # LoleveCausalEqtlTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
         BRCA1Task(root_data_dir_path=root_data_dir_path, task_config=task_config),
         GueTranscriptionFactorTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        GuePromoterAllTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        GueSpliceSiteTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        BendVEPExpression(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        BendVEPDisease(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        SonglabClinvarTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        VariantBenchmarksCodingTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        VariantBenchmarksNonCodingTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        VariantBenchmarksExpressionTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        VariantBenchmarksCommonVsRareTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        VariantBenchmarksMEQTLTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        VariantBenchmarksSQTLTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        TraitGymComplexTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        TraitGymMendelianTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        LrbVariantEffectPathogenicOmimTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        LRBCausalEqtlTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        # GuePromoterAllTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        # GueSpliceSiteTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        # BendVEPExpression(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        # BendVEPDisease(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        # SonglabClinvarTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        # VariantBenchmarksCodingTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        # VariantBenchmarksNonCodingTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        # VariantBenchmarksExpressionTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        # VariantBenchmarksCommonVsRareTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        # VariantBenchmarksMEQTLTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        # VariantBenchmarksSQTLTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        # TraitGymComplexTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        # TraitGymMendelianTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        # LrbVariantEffectPathogenicOmimTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        # LRBCausalEqtlTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
     ]
 
     # Training parameters for fine-tuning tasks
@@ -286,7 +299,7 @@ def main():
         has_finetuning_data = task_attrs.get("has_finetuning_data", False)
 
         # Reinitialize model for each task to start fresh
-        model = ModelClass(device=device, max_length=max_length)
+        model = ModelClass(device=device, max_length=max_length, **model_init_kwargs)
         if checkpoint_path:
             logging.info(f"Loading checkpoint: {checkpoint_path}")
             model.load_checkpoint(checkpoint_path)

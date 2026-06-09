@@ -1,7 +1,7 @@
 # --- core runtime ---
 numpy==1.26.4
 pandas==3.0.3
-torch>=2.12.0
+torch>=2.0.0,<3
 tqdm==4.67.3
 
 # --- data I/O (HuggingFace + reference genomes + parquet caches) ---
