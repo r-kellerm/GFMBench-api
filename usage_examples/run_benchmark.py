@@ -25,6 +25,8 @@ from pathlib import Path
 # Set before torch import for deterministic cuBLAS matmuls (see JEPA-DNA run_benchmark.py)
 if "CUBLAS_WORKSPACE_CONFIG" not in os.environ:
     os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+# Safe with DataLoader num_workers > 0 after HuggingFace tokenizers are used in the main process
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
 # Ensure we import from the gfmbench_api_rep directory
 # Add the gfmbench_api_rep root to the path if not already there
@@ -280,11 +282,12 @@ def main():
         load_mlm_head_only(model, mlm_head_path)
     
     # Task configuration for DNABERT-2 (max 512 tokens by default, can extrapolate longer)
-    # Supported keys: max_sequence_length, batch_size, max_num_samples, disable_safe_model_call, disable_cache
+    # Supported keys: max_sequence_length, batch_size, num_workers, max_num_samples, disable_safe_model_call, disable_cache
     # Set to None for models with no sequence length limit (e.g., HyenaDNA)
     task_config = {
         "max_sequence_length": max_length,
         "batch_size": 32,
+        "num_workers": 0,
         "max_num_samples": None,
         "disable_safe_model_call": args.disable_safe_model_call,
         "disable_cache": args.disable_cache,
@@ -330,6 +333,7 @@ def main():
         "weight_decay": 0.01,
         "only_proj_layer": args.linear_prob,
         "batch_size": 32,
+        "num_workers": 0,
     }
 
     logging.info(f"********* Number of tasks: {len(tasks)} *********")
@@ -377,9 +381,10 @@ def main():
             generator.manual_seed(seed)
 
             train_loader = DataLoader(
-                train_dataset, 
-                batch_size=training_params.get("batch_size", 32), 
+                train_dataset,
+                batch_size=training_params["batch_size"],
                 shuffle=True,
+                num_workers=training_params["num_workers"],
                 generator=generator,
             )
             

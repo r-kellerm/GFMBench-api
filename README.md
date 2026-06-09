@@ -177,6 +177,7 @@ This reference script demonstrates a standard workflow:
   Edit parameters like `max_sequence_length`, `batch_size`, or `disable_cache`.
 - **Training parameters**  
   Change `num_epochs`, `learning_rate`, etc. in the training_params dict.
+- **Reproducibility:** Using `num_workers > 0` may cause non-deterministic results on several tasks; for full reproducibility in `usage_examples/run_benchmark.py`, keep the default `num_workers = 0`.
 - **Task list**  
   Edit/add the tasks in the `tasks = [...]` list.
 - **Model registry**  

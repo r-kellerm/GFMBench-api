@@ -101,7 +101,9 @@ class BaseGFMZeroShotTask(BaseGFMTask):
             dict: Scores with metric names as keys.
         """
         # Create dataloader from dataset
-        data_loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
+        data_loader = DataLoader(
+            dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers
+        )
         
         # Define common metrics with their argument keys
         # Each entry: (metric, arg_keys) where arg_keys specifies which outputs to pass
