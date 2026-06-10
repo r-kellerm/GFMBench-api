@@ -64,7 +64,10 @@ class BendVEPDisease(BaseGFMZeroShotSNVTask):
     def get_task_name(self):
         """Return task name (identical to data directory name)."""
         return "bend_variant_effects_disease"
-    
+
+    def use_reference_cache(self) -> bool:
+        return True
+
     def _create_test_dataset(self):
         """
         Create test dataset from BED file.
