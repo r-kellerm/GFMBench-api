@@ -28,6 +28,7 @@ GFMBench-API separates **package dependencies** from **model dependencies**. Mod
    |-------|-------------------|
    | Evo2 | [evo2 `pyproject.toml`](https://github.com/ArcInstitute/evo2/blob/main/pyproject.toml) |
    | Nucleotide Transformer (NTv3) | [nucleotide-transformer `setup.py`](https://github.com/instadeepai/nucleotide-transformer/blob/main/setup.py) |
+   | DNABERT2 | [DNABERT_2 `requirements.txt`](https://github.com/MAGICS-LAB/DNABERT_2/blob/main/requirements.txt) |
 
 3. Install GFMBench-API core dependencies on top of your model environment:
    ```bash
@@ -35,23 +36,6 @@ GFMBench-API separates **package dependencies** from **model dependencies**. Mod
    ```
 
    `basic_requirements.txt` contains only what the `gfmbench_api` package needs (tasks, metrics, data I/O, etc.) — no model-specific libraries.
-
-4. **DNABERT2 users only:** skip steps 2–3 and use the bundled requirements file instead:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-   `requirements.txt` combines DNABERT2/DNABERT runtime dependencies with GFMBench-API requirements. Use this file only if you plan to run the DNABERT2 examples in `usage_examples/`.
-
-5. (Optional, GPU users) Check CUDA availability:
-   ```bash
-   python -c "import torch; print(torch.cuda.is_available())"
-   ```
-
-6. (Optional, DNABERT2 only) Install flash attention:
-   ```bash
-   pip install flash-attn --no-build-isolation
-   ```
 
 ---
 
@@ -82,8 +66,7 @@ gfmbench_api_rep/
 │   ├── trainers/
 │   └── sanity_models/
 ├── logs/                      # Logs (autocreated)
-├── basic_requirements.txt     # GFMBench-API core only (model-agnostic)
-└── requirements.txt           # DNABERT2 + GFMBench-API (examples shortcut)
+└── basic_requirements.txt     # GFMBench-API core only (model-agnostic)
 ```
 
 ---
