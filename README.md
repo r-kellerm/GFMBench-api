@@ -6,6 +6,8 @@ GFMBench-API is an extensible benchmarking suite for assessing genomic foundatio
 
 ### Installation
 
+GFMBench-API separates **package dependencies** from **model dependencies**. Model runtimes (Evo2, Nucleotide Transformer, DNABERT2, etc.) are maintained by their own projects and are not bundled into the core package.
+
 1. Create a virtual environment (choose one option):
 
    **Option A: Using pip (venv)**
@@ -16,27 +18,25 @@ GFMBench-API is an extensible benchmarking suite for assessing genomic foundatio
 
    **Option B: Using conda**
    ```bash
-   conda create -n gfmbench_env python=3.10
+   conda create -n gfmbench_env python=3.11
    conda activate gfmbench_env
    ```
 
-2. Install required Python dependencies:
+2. Install dependencies for **your model** first, following that model's own environment setup. Examples:
+
+   | Model | Dependency source |
+   |-------|-------------------|
+   | Evo2 | [evo2 `pyproject.toml`](https://github.com/ArcInstitute/evo2/blob/main/pyproject.toml) |
+   | Nucleotide Transformer (NTv3) | [nucleotide-transformer `setup.py`](https://github.com/instadeepai/nucleotide-transformer/blob/main/setup.py) |
+   | DNABERT2 | [DNABERT_2 `requirements.txt`](https://github.com/MAGICS-LAB/DNABERT_2/blob/main/requirements.txt) |
+
+3. Install GFMBench-API core dependencies on top of your model environment:
    ```bash
-   pip install -r requirements.txt
+   pip install -r basic_requirements.txt
    ```
 
-3. (Optional, GPU users) Check CUDA availability:
-   ```bash
-   python -c "import torch; print(torch.cuda.is_available())"
-   ```
+   `basic_requirements.txt` contains only what the `gfmbench_api` package needs (tasks, metrics, data I/O, etc.) — no model-specific libraries.
 
-4. (Optional, for DNABERT2 with flash attention):
-   ```bash
-   pip install flash-attn --no-build-isolation
-   ```
-
-   Note: The requirements in `requirements.txt` are configured for running examples with DNABERT2 and DNABERT models.
-   For other models or algorithms, additional dependencies may be required and should be installed separately.
 ---
 
 ## What’s Included?
@@ -66,7 +66,7 @@ gfmbench_api_rep/
 │   ├── trainers/
 │   └── sanity_models/
 ├── logs/                      # Logs (autocreated)
-└── requirements.txt
+└── basic_requirements.txt     # GFMBench-API core only (model-agnostic)
 ```
 
 ---
