@@ -72,7 +72,7 @@ class SonglabClinvarTask(BaseGFMZeroShotSNVTask):
         super().__init__(root_data_dir_path, task_config)
 
     def get_task_name(self) -> str:
-        """Return task name (identical to data directory name)."""
+        """Return task name for reports."""
         return "songlab_clinvar"
 
     def use_reference_cache(self) -> bool:
@@ -95,7 +95,7 @@ class SonglabClinvarTask(BaseGFMZeroShotSNVTask):
             ensure_reference_genome(self.reference_genome_path)
 
         # Ensure data dir exists
-        data_dir = os.path.join(self.root_data_dir_path, self.get_task_name())
+        data_dir = os.path.join(self.root_data_dir_path, self._get_task_data_dir_name())
         os.makedirs(data_dir, exist_ok=True)
         parquet_path = os.path.join(data_dir, "clinvar_data.parquet")
 

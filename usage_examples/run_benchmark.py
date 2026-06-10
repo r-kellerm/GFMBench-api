@@ -108,14 +108,6 @@ def parse_args():
         help="Checkpoint to load (set to None to use default HuggingFace weights)"
     )
     parser.add_argument(
-        "--mlm_head_path",
-        type=str,
-        default=None,
-        help="Path to checkpoint containing MLM head weights. If provided along with "
-             "--checkpoint_path, first loads full checkpoint, then overwrites MLM head "
-             "with weights from this path. Only mlm_head_state_dict is loaded; other weights are ignored."
-    )
-    parser.add_argument(
         "--linear_prob",
         action="store_true",
         help="If set, train only the projection layer for supervised tasks (linear probing). "
@@ -201,48 +193,6 @@ def _format_elapsed(seconds: float) -> str:
     return f"{seconds:.1f}s"
 
 
-def load_mlm_head_only(model, mlm_head_path: str):
-    """
-    Load only the MLM head weights from a checkpoint.
-    
-    Handles checkpoints that contain:
-    - mlm_head_state_dict: Load MLM head weights directly
-    - model_state_dict + mlm_head_state_dict: Load only mlm_head_state_dict, ignore model weights
-    - mlm_model_state_dict (legacy): Extract and load only cls.* weights
-    
-    Args:
-        model: DNABERT2Model instance
-        mlm_head_path: Path to checkpoint file containing MLM head weights
-    """
-    logging.info(f"Loading MLM head only from: {mlm_head_path}")
-    state = torch.load(mlm_head_path, map_location=model.device)
-    
-    if 'mlm_head_state_dict' in state:
-        # New format: mlm_head_state_dict is directly available
-        model.mlm_head.load_state_dict(state['mlm_head_state_dict'])
-        model.mlm_head_loaded = True
-        logging.info("Loaded MLM head weights from mlm_head_state_dict")
-        
-    elif 'mlm_model_state_dict' in state:
-        # Legacy format: extract cls.* weights from full AutoModelForMaskedLM state
-        mlm_state = state['mlm_model_state_dict']
-        mlm_head_state = {}
-        for key, value in mlm_state.items():
-            if key.startswith('cls.'):
-                mlm_head_state[key[4:]] = value  # Remove 'cls.' prefix
-        
-        if mlm_head_state:
-            model.mlm_head.load_state_dict(mlm_head_state, strict=False)
-            model.mlm_head_loaded = True
-            logging.info("Loaded MLM head weights from legacy mlm_model_state_dict")
-        else:
-            logging.warning("No MLM head weights found in legacy checkpoint")
-    else:
-        logging.error(f"No MLM head weights found in {mlm_head_path}")
-        logging.error(f"  Available keys: {list(state.keys())}")
-        raise ValueError("No MLM head weights found in MLM head checkpoint")
-
-
 def main():
     # Initialize logging
     logutils.init_logger()
@@ -269,9 +219,8 @@ def main():
     # Model configuration
     report_algo_name = args.report_algo_name
     
-    # Checkpoint paths
+    # Checkpoint path
     checkpoint_path = args.checkpoint_path
-    mlm_head_path = args.mlm_head_path
     
     # Get model class and max_length from registry
     if args.model not in MODEL_REGISTRY:
@@ -288,8 +237,6 @@ def main():
     model = ModelClass(device=device, max_length=max_length, **model_init_kwargs)
     if checkpoint_path:
         model.load_checkpoint(checkpoint_path)
-    if mlm_head_path:
-        load_mlm_head_only(model, mlm_head_path)
     
     # Task configuration for DNABERT-2 (max 512 tokens by default, can extrapolate longer)
     # Supported keys: max_sequence_length, batch_size, num_workers, max_num_samples, disable_safe_model_call, disable_cache
@@ -375,9 +322,6 @@ def main():
         if checkpoint_path:
             logging.info(f"Loading checkpoint: {checkpoint_path}")
             model.load_checkpoint(checkpoint_path)
-        if mlm_head_path:
-            logging.info(f"Loading MLM head from: {mlm_head_path}")
-            load_mlm_head_only(model, mlm_head_path)
 
         if has_finetuning_data:
             # Fine-tune for classification tasks

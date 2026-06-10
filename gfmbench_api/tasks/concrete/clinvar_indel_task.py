@@ -92,7 +92,7 @@ class IndelClinvarTask(BaseGFMZeroShotGeneralIndelTask):
         )
 
         # Data directory for this task (follows framework convention)
-        self._task_data_dir = os.path.join(root_data_dir_path, "clinvar_indel")
+        self._task_data_dir = os.path.join(root_data_dir_path, self._get_task_data_dir_name())
 
         # Paths for raw and processed data
         self._raw_data_path = os.path.join(self._task_data_dir, "variant_summary_2026-01.txt.gz")

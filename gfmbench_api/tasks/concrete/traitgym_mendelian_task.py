@@ -53,7 +53,7 @@ def _load_traitgym_dataset(
     root_data_dir_path: str,
     dataset_config: str,
     max_sequence_length: int,
-    task_name: str,
+    task_data_dir_name: str,
 ) -> tuple:
     """
     Shared helper function to load and process TraitGym dataset.
@@ -70,7 +70,7 @@ def _load_traitgym_dataset(
             f"Please download a reference genome (e.g., hg38.fa) from UCSC or Ensembl"
         )
 
-    data_dir = os.path.join(root_data_dir_path, task_name)
+    data_dir = os.path.join(root_data_dir_path, task_data_dir_name)
     os.makedirs(data_dir, exist_ok=True)
     parquet_path = os.path.join(data_dir, f"TraitGym_{dataset_config}_data.parquet")
 
@@ -158,7 +158,7 @@ class TraitGymMendelianTask(BaseGFMZeroShotSNVTask):
         super().__init__(root_data_dir_path, task_config)
 
     def get_task_name(self) -> str:
-        """Return task name (used for data directory)."""
+        """Return task name for reports."""
         return "traitgym_mendelian"
 
     def use_reference_cache(self) -> bool:
@@ -175,7 +175,7 @@ class TraitGymMendelianTask(BaseGFMZeroShotSNVTask):
             root_data_dir_path=self.root_data_dir_path,
             dataset_config=self.dataset_config,
             max_sequence_length=self.max_sequence_length,
-            task_name=self.get_task_name(),
+            task_data_dir_name=self._get_task_data_dir_name(),
         )
         
         # Store flank_size for _get_variant_position_in_sequence
