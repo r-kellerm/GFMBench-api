@@ -116,12 +116,8 @@ class DNABERT2Model(nn.Module):
         else:
             attn_type = "unknown attention mode"
 
-        hf_home = os.environ.get("HF_HOME", "not set")
-        cache_status = "✓ /efs cache" if "/efs/" in module_file else f"✗ NOT /efs (HF_HOME={hf_home})"
-
         print(f"DNA-BERT2 loaded successfully. Hidden dim: {self.hidden_dim}, max_length: {self.max_length}")
         print(f"  Attention: {attn_type}")
-        print(f"  Cache: {cache_status}")
         print(f"  Module: {module_file}")
 
     def eval(self):
