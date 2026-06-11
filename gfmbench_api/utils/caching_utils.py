@@ -264,6 +264,17 @@ class SequenceInferenceCache:
         return out
 
     @staticmethod
+    def _pad_prob_rows(rows: List[np.ndarray]) -> np.ndarray:
+        """Pad variable-length per-sequence 1D rows (e.g. token probs) to a common length."""
+        if not rows:
+            return np.zeros((0,), dtype=np.float32)
+        max_len = max(row.shape[0] for row in rows)
+        out = np.zeros((len(rows), max_len), dtype=rows[0].dtype)
+        for i, row in enumerate(rows):
+            out[i, : row.shape[0]] = row
+        return out
+
+    @staticmethod
     def _merge_rows(rows: List[Any]) -> Any:
         if all(row is None for row in rows):
             return None
@@ -275,6 +286,14 @@ class SequenceInferenceCache:
                 np.zeros_like(first) if row is None else np.asarray(row) for row in rows
             ]
             return SequenceInferenceCache._pad_embedding_rows(padded)
+
+        if isinstance(first, np.ndarray) and first.ndim == 1:
+            max_len = max(np.asarray(row).shape[0] for row in rows if row is not None)
+            padded = [
+                np.zeros(max_len, dtype=first.dtype) if row is None else np.asarray(row)
+                for row in rows
+            ]
+            return SequenceInferenceCache._pad_prob_rows(padded)
 
         if isinstance(first, np.ndarray):
             out = np.zeros((len(rows),) + first.shape, dtype=first.dtype)

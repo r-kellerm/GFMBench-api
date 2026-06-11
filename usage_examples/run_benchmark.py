@@ -273,6 +273,7 @@ def main(argv=None):
     
     checkpoint_path = args.checkpoint_path
 
+
     if args.model == "Evo2" and not args.linear_prob:
         raise ValueError("Evo2 does not support full fine-tuning. Use --linear_prob for Evo2 benchmarks.")
     ModelClass = get_model_class(args.model)
@@ -285,6 +286,7 @@ def main(argv=None):
     model = ModelClass(device=device, max_length=max_length, **model_init_kwargs)
     if checkpoint_path:
         model.load_checkpoint(checkpoint_path)
+
 
     # Task configuration for DNABERT-2 (max 512 tokens by default, can extrapolate longer)
     # Supported keys: max_sequence_length, batch_size, num_workers, max_num_samples, disable_safe_model_call, disable_cache

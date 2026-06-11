@@ -347,12 +347,12 @@ class NucleotideTransformerV3Model(BaseGFMModel):
     def parameters(self, recurse: bool = True):
         return self.model.parameters(recurse=recurse)
 
-    def load_checkpoint(self, checkpoint_path: str, load_mlm_head: bool = True) -> "NucleotideTransformerV3Model":
+    def load_checkpoint(self, checkpoint_path: str) -> "NucleotideTransformerV3Model":
         logger.info("Loading NTv3 checkpoint: %s", checkpoint_path)
         payload = torch.load(checkpoint_path, map_location=self.device)
         state_dict = payload.get("model_state_dict", payload) if isinstance(payload, dict) else payload
         self.model.load_state_dict(state_dict, strict=False)
         self.model.eval()
-        self.mlm_head_loaded = load_mlm_head
+        self.mlm_head_loaded = True
         logger.info("NTv3 checkpoint loaded")
         return self

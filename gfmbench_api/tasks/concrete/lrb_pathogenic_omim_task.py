@@ -137,7 +137,7 @@ class LrbVariantEffectPathogenicOmimTask(BaseGFMZeroShotSNVTask):
         cfg = self.task_config or {}
         
         # Setup Paths based on Root Dir
-        task_data_dir = os.path.join(self.root_data_dir_path, self.get_task_name())
+        task_data_dir = os.path.join(self.root_data_dir_path, self._get_task_data_dir_name())
         os.makedirs(task_data_dir, exist_ok=True)
         
         # Ensure reference genome exists (auto-download if missing)

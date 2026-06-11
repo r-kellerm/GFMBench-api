@@ -103,7 +103,7 @@ class VariantBenchmarksCommonVsRareTask(BaseGFMSupervisedVariantEffectTask):
         return "var_bench_common_vs_rare"
     
     def _create_datasets(self):
-        data_dir = os.path.join(self.root_data_dir_path, self.get_task_name())
+        data_dir = os.path.join(self.root_data_dir_path, self._get_task_data_dir_name())
 
         # Download data if not exists
         logging.info(f"Downloading {self.get_task_name()} from HuggingFace...")
