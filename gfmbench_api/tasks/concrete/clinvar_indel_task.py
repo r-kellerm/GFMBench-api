@@ -103,6 +103,9 @@ class IndelClinvarTask(BaseGFMZeroShotGeneralIndelTask):
     def get_task_name(self) -> str:
         return "clinvar_indel"
 
+    def use_reference_cache(self) -> bool:
+        return True
+
     def _get_default_max_seq_len(self) -> int:
         """Default context window: ~1M , 2^20."""
         return 1048576

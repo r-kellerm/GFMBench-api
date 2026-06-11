@@ -15,79 +15,30 @@
 
 # This module does not embed third-party data download URLs.
 """
-Benchmarks package for GFM evaluation.
+GFMBench-API — genomic foundation model benchmarking middleware.
 
-This package provides:
-- Base classes for tasks and models
-- Metric implementations
-- Concrete task implementations
+Import base task/model classes from this package; import concrete tasks
+directly from their modules under ``gfmbench_api.tasks.concrete``.
 """
 
 from gfmbench_api.tasks.base import (
-    # Core classes
     BaseGFMModel,
     BaseGFMTask,
-    # Supervised task hierarchy
     BaseGFMSupervisedMultiClassTask,
     BaseGFMSupervisedSingleSeqTask,
     BaseGFMSupervisedVariantEffectTask,
-    # Zero-shot task hierarchy
-    BaseGFMZeroShotTask,
-    BaseGFMZeroShotSNVTask,
     BaseGFMZeroShotGeneralIndelTask,
-)
-
-from gfmbench_api.tasks.concrete import (
-    # GUE tasks
-    GuePromoterAllTask,
-    GueSpliceSiteTask,
-    GueTranscriptionFactorTask,
-    # BEND tasks
-    BendVEPExpression,
-    BendVEPDisease,
-    # LRB tasks
-    LrbVariantEffectPathogenicOmimTask,
-    # TraitGym tasks
-    TraitGymComplexTask,
-    TraitGymMendelianTask,
-    # VariantBenchmarks tasks
-    VariantBenchmarksCodingTask,
-    VariantBenchmarksNonCodingTask,
-    VariantBenchmarksExpressionTask,
-    VariantBenchmarksCommonVsRareTask,
-    VariantBenchmarksMEQTLTask,
-    VariantBenchmarksSQTLTask,
+    BaseGFMZeroShotSNVTask,
+    BaseGFMZeroShotTask,
 )
 
 __all__ = [
-    # Core classes
     "BaseGFMModel",
     "BaseGFMTask",
-    # Supervised task hierarchy
     "BaseGFMSupervisedMultiClassTask",
     "BaseGFMSupervisedSingleSeqTask",
     "BaseGFMSupervisedVariantEffectTask",
-    # Zero-shot task hierarchy
     "BaseGFMZeroShotTask",
     "BaseGFMZeroShotSNVTask",
     "BaseGFMZeroShotGeneralIndelTask",
-    # GUE tasks
-    "GuePromoterAllTask",
-    "GueSpliceSiteTask",
-    "GueTranscriptionFactorTask",
-    # BEND tasks
-    "BendVEPExpression",
-    "BendVEPDisease",
-    # LRB tasks
-    "LrbVariantEffectPathogenicOmimTask",
-    # TraitGym tasks
-    "TraitGymComplexTask",
-    "TraitGymMendelianTask",
-    # VariantBenchmarks tasks
-    "VariantBenchmarksCodingTask",
-    "VariantBenchmarksNonCodingTask",
-    "VariantBenchmarksExpressionTask",
-    "VariantBenchmarksCommonVsRareTask",
-    "VariantBenchmarksMEQTLTask",
-    "VariantBenchmarksSQTLTask",
 ]

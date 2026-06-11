@@ -21,6 +21,7 @@ import torch
 import torch.nn as nn
 
 from gfmbench_api.tasks.base.base_gfm_model import BaseGFMModel
+from gfmbench_api.utils.caching_utils import SequenceInferenceCache
 
 
 class GFMWithProjection(BaseGFMModel):
@@ -29,18 +30,26 @@ class GFMWithProjection(BaseGFMModel):
     The benchmark treats this as a single unified model.
     """
     
-    def __init__(self, base_model: BaseGFMModel, projection_layer: Optional[nn.Module] = None) -> None:
+    def __init__(self, base_model: BaseGFMModel, projection_layer: Optional[nn.Module] = None,
+                 disable_cache: bool = False) -> None:
         """
         Initialize the wrapped model.
         
         Args:
             base_model: BaseGFMModel instance
             projection_layer: nn.Module - projection layer (optional, for classification tasks)
+            disable_cache: if True, skip reference-sequence inference cache during VEP eval
         """
         self.base_model: BaseGFMModel = base_model
         self.projection_layer: Optional[nn.Module] = projection_layer
         self.device: str = base_model.device
-    
+        self.disable_cache = disable_cache
+        self._ref_cache = SequenceInferenceCache()
+
+    def clear_ref_cache(self) -> None:
+        """Clear cached reference-sequence inference (call after each benchmark task)."""
+        self._ref_cache.clear()
+
     def infer_sequence_to_labels_probs(self, sequences: List[str], conditional_input=None) -> Optional[np.ndarray]:
         """
         Forward pass through the model and projection layer to get label probabilities.
@@ -180,8 +189,15 @@ class GFMWithProjection(BaseGFMModel):
                        otherwise returns None
         """
         # Get representative embeddings from base model using infer_sequence_to_sequence
-        _, _, var_repr_np = self.base_model.infer_sequence_to_sequence(variant_sequences, conditional_input)
-        _, _, ref_repr_np = self.base_model.infer_sequence_to_sequence(ref_sequences, conditional_input)
+        _, _, var_repr_np = self.base_model.infer_sequence_to_sequence(
+            variant_sequences, conditional_input
+        )
+        _, _, ref_repr_np = self._ref_cache.cached_call(
+            self.base_model.infer_sequence_to_sequence,
+            ref_sequences,
+            conditional_input,
+            disable=self.disable_cache,
+        )
         
         if var_repr_np is None or ref_repr_np is None:
             return None

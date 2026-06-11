@@ -6,6 +6,8 @@ GFMBench-API is an extensible benchmarking suite for assessing genomic foundatio
 
 ### Installation
 
+GFMBench-API separates **package dependencies** from **model dependencies**. Model runtimes (Evo2, Nucleotide Transformer, DNABERT2, etc.) are maintained by their own projects and are not bundled into the core package.
+
 1. Create a virtual environment (choose one option):
 
    **Option A: Using pip (venv)**
@@ -16,27 +18,25 @@ GFMBench-API is an extensible benchmarking suite for assessing genomic foundatio
 
    **Option B: Using conda**
    ```bash
-   conda create -n gfmbench_env python=3.10
+   conda create -n gfmbench_env python=3.11
    conda activate gfmbench_env
    ```
 
-2. Install required Python dependencies:
+2. Install dependencies for **your model** first, following that model's own environment setup. Examples:
+
+   | Model | Dependency source |
+   |-------|-------------------|
+   | Evo2 | [evo2 `pyproject.toml`](https://github.com/ArcInstitute/evo2/blob/main/pyproject.toml) |
+   | Nucleotide Transformer (NTv3) | [nucleotide-transformer `setup.py`](https://github.com/instadeepai/nucleotide-transformer/blob/main/setup.py) |
+   | DNABERT2 | [DNABERT_2 `requirements.txt`](https://github.com/MAGICS-LAB/DNABERT_2/blob/main/requirements.txt) |
+
+3. Install GFMBench-API core dependencies on top of your model environment:
    ```bash
-   pip install -r requirements.txt
+   pip install -r basic_requirements.txt
    ```
 
-3. (Optional, GPU users) Check CUDA availability:
-   ```bash
-   python -c "import torch; print(torch.cuda.is_available())"
-   ```
+   `basic_requirements.txt` contains only what the `gfmbench_api` package needs (tasks, metrics, data I/O, etc.) — no model-specific libraries.
 
-4. (Optional, for DNABERT2 with flash attention):
-   ```bash
-   pip install flash-attn --no-build-isolation
-   ```
-
-   Note: The requirements in `requirements.txt` are configured for running examples with DNABERT2 and DNABERT models.
-   For other models or algorithms, additional dependencies may be required and should be installed separately.
 ---
 
 ## What’s Included?
@@ -60,13 +60,13 @@ gfmbench_api_rep/
 │   ├── tasks/                 # Task definitions
 │   │   ├── base/              # Base task/model classes
 │   │   └── concrete/          # 20+ ready-to-use tasks
-│   └── utils/                 # Misc utilities (data I/O, download helpers)
+│   └── utils/                 # Misc utilities (data I/O, download helpers, inference cache)
 ├── usage_examples/            # Getting started scripts and toy models
 │   ├── run_benchmark.py
 │   ├── trainers/
 │   └── sanity_models/
 ├── logs/                      # Logs (autocreated)
-└── requirements.txt
+└── basic_requirements.txt     # GFMBench-API core only (model-agnostic)
 ```
 
 ---
@@ -104,6 +104,8 @@ GFMBench-API supports evaluation on **20 unique tasks**, grouped as:
 | TraitGymMendelianTask             | Zero-shot prediction of Mendelian disease-associated variants. |
 | LrbVariantEffectPathogenicOmimTask   | Zero-shot prediction of pathogenic variants associated with Mendelian diseases. |
 | LoleveCausalEqtlTask                 | Zero-shot prediction of causal expression-modulating variants (indels) in promoters. |
+
+Several zero-shot variant effect prediction tasks repeat the same reference sequence across variants. For tasks where that pattern is common, reference sequences are cached during evaluation to avoid redundant forward passes and improve efficiency. Caching is applied only where it offers a meaningful memory and latency tradeoff. To disable caching (e.g. due to memory limits), set `"disable_cache": True` in `task_config`.
 
 ---
 
@@ -172,9 +174,10 @@ This reference script demonstrates a standard workflow:
   sanity_check_mode = True  # Set to False for full eval
   ```
 - **Task configuration**  
-  Edit parameters like `max_sequence_length`, `batch_size`.
+  Edit parameters like `max_sequence_length`, `batch_size`, or `disable_cache`.
 - **Training parameters**  
   Change `num_epochs`, `learning_rate`, etc. in the training_params dict.
+- **Reproducibility:** Using `num_workers > 0` may cause non-deterministic results on several tasks; for full reproducibility in `usage_examples/run_benchmark.py`, keep the default `num_workers = 0`.
 - **Task list**  
   Edit/add the tasks in the `tasks = [...]` list.
 - **Model registry**  
@@ -208,6 +211,26 @@ python usage_examples/run_benchmark.py \
     --report_algo_name linear_probe \
     --csv_path results/linear_probe_results.csv
 ```
+
+Disable inference cache (e.g. memory limits):  
+```bash
+python usage_examples/run_benchmark.py \
+    --model DNABERT2 \
+    --disable_cache \
+    --report_algo_name no_cache \
+    --csv_path results/no_cache_results.csv
+```
+
+#### Inference caching
+
+Selected zero-shot variant effect prediction tasks cache repeated reference sequences during evaluation (see above). Set `"disable_cache": True` in `task_config` to turn this off.
+
+On top of that, `usage_examples/run_benchmark.py` uses the same caching utility (`gfmbench_api/utils/caching_utils.py`) in two other places:
+
+- **Linear probing (`--linear_prob`):** caches frozen backbone forwards when only the projection layer is trained.
+- **Supervised variant effect prediction:** caches reference sequences during evaluation.
+
+Caches are cleared after each task. Pass `--disable_cache` to disable all caching.
 
 ---
 
@@ -357,6 +380,9 @@ Additional methods for supervised tasks:
 
 5. **`_get_num_labels() -> int`**: Return the number of classification labels
 
+Additional methods for zero-shot tasks:
+
+5. **`use_reference_cache() -> bool`**: Return `True` if repeated reference sequences make eval-time caching worthwhile; otherwise `False`.
 ### Example: Supervised Single-Sequence Task
 
 ```python
@@ -425,6 +451,9 @@ class MyZeroShotTask(BaseGFMZeroShotSNVTask):
     
     def get_conditional_input_meta_data_frame(self):
         return None
+
+    def use_reference_cache(self) -> bool:
+        return True  # Set False if references are mostly unique per variant
 ```
 
 

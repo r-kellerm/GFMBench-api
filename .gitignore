@@ -5,3 +5,7 @@ __pycache__/
 
 # Editor / IDE (local machine)
 .vscode/
+
+# Pipeline logs from usage_examples/run_benchmark.py (logutils.init_logger → logs/)
+logs/
+.cursor/rules/shell-environment.mdc

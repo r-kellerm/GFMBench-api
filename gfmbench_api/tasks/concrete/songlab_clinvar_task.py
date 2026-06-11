@@ -75,6 +75,9 @@ class SonglabClinvarTask(BaseGFMZeroShotSNVTask):
         """Return task name (identical to data directory name)."""
         return "songlab_clinvar"
 
+    def use_reference_cache(self) -> bool:
+        return True
+
     def _get_default_max_seq_len(self) -> int:
         """Return the task's default maximum sequence length.
         """

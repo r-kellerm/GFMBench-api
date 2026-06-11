@@ -115,7 +115,9 @@ class BaseGFMSupervisedMultiClassTask(BaseGFMTask):
         """
         
         # Create dataloader from dataset
-        data_loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
+        data_loader = DataLoader(
+            dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers
+        )
 
         # Initialize metric classes
         metrics = [
