@@ -57,7 +57,7 @@ class GueSpliceSiteTask(BaseGFMSupervisedSingleSeqTask):
 
     def _create_datasets(self) -> Tuple[Optional[Dataset], Optional[Dataset], Dataset]:
         """Create train, validation, and test datasets from CSV files."""
-        data_dir = os.path.join(self.root_data_dir_path, self.get_task_name())
+        data_dir = os.path.join(self.root_data_dir_path, self._get_task_data_dir_name())
         train_path = os.path.join(data_dir, "train.csv")
         val_path = os.path.join(data_dir, "dev.csv")
         test_path = os.path.join(data_dir, "test.csv")

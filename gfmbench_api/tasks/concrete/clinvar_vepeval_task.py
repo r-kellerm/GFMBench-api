@@ -60,13 +60,20 @@ class VepevalClinvarTask(BaseGFMZeroShotSNVTask):
 
         # Paths to reference genome and parquet file
         self.reference_genome_path = os.path.join(root_data_dir_path, "reference_genome", "hg38.fa")
-        self.dataset_path = os.path.join(root_data_dir_path, "clinvar_vep_eval", "ClinVarBenchmark_subset_S1.parquet")
+        self.dataset_path = os.path.join(
+            root_data_dir_path,
+            self._get_task_data_dir_name(),
+            "ClinVarBenchmark_subset_S1.parquet",
+        )
 
         # Initialize base class (creates datasets by calling _create_test_dataset)
         super().__init__(root_data_dir_path, task_config)
 
     def get_task_name(self) -> str:
         return "vepeval_clinvar"
+
+    def _get_task_data_dir_name(self) -> str:
+        return "clinvar_vep_eval"
 
     def use_reference_cache(self) -> bool:
         return True

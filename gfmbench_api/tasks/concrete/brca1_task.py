@@ -55,7 +55,9 @@ class BRCA1Task(BaseGFMZeroShotSNVTask):
         """
         # --- CHANGE 1: Point to the specific downloaded reference file ---
         # It is located in the task folder (brca1), not the shared reference_genome folder
-        self.reference_genome_path = os.path.join(root_data_dir_path, self.get_task_name(), "GRCh37.p13_chr17.fna")
+        self.reference_genome_path = os.path.join(
+            root_data_dir_path, self._get_task_data_dir_name(), "GRCh37.p13_chr17.fna"
+        )
 
         super().__init__(root_data_dir_path, task_config)
     
@@ -74,7 +76,7 @@ class BRCA1Task(BaseGFMZeroShotSNVTask):
         except ImportError:
             raise ImportError("pyfaidx is required. Install with: pip install pyfaidx")
         
-        data_dir = os.path.join(self.root_data_dir_path, self.get_task_name())
+        data_dir = os.path.join(self.root_data_dir_path, self._get_task_data_dir_name())
         data_path = os.path.join(data_dir, "brca1.parquet")
         
         # Auto-download dataset and reference genome if missing (consistent with ClinVar task pattern)

@@ -95,7 +95,7 @@ class LRBCausalEqtlTask(BaseGFMSupervisedVariantEffectTask):
         return 1048576 
 
     def _create_datasets(self) -> Tuple[Optional[Dataset], Optional[Dataset], Dataset]:
-        task_data_dir = os.path.join(self.root_data_dir_path, self.get_task_name())
+        task_data_dir = os.path.join(self.root_data_dir_path, self._get_task_data_dir_name())
         genome_dir = os.path.join(self.root_data_dir_path, "reference_genome")
         os.makedirs(task_data_dir, exist_ok=True)
         os.makedirs(genome_dir, exist_ok=True)

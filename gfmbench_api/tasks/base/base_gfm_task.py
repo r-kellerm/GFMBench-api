@@ -272,12 +272,19 @@ class BaseGFMTask(ABC):
     @abstractmethod
     def get_task_name(self) -> str:
         """
-        Subclasses must implement this: return the task name.
-        
-        The task name should be identical to the data directory name containing
-        the task's data files.
+        Subclasses must implement this: return the task name for reports and logging.
         
         Returns:
-            str: Task name (e.g., 'gue_promoter_all', 'bend_vep_disease')
+            str: Task name (e.g., 'gue_promoter_all', 'vepeval_clinvar')
         """
         pass
+
+    def _get_task_data_dir_name(self) -> str:
+        """
+        Return the subdirectory name under root_data_dir_path for this task's data files.
+        
+        Defaults to get_task_name(). Override when the on-disk directory name differs
+        from the task name, for example when several tasks share the same raw data
+        directory but use distinct task_names in reports.
+        """
+        return self.get_task_name()

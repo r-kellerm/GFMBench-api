@@ -93,7 +93,7 @@ class BendVEPExpression(BaseGFMZeroShotSNVTask):
         genome = Fasta(self.reference_genome_path)
         
         # Load BED file
-        data_dir = os.path.join(self.root_data_dir_path, self.get_task_name())
+        data_dir = os.path.join(self.root_data_dir_path, self._get_task_data_dir_name())
         data_path = os.path.join(data_dir, "data.bed")
         
         # Download data if not exists
