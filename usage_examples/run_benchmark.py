@@ -66,6 +66,29 @@ from gfmbench_api.tasks.concrete.clinvar_vepeval_task import VepevalClinvarTask
 from gfmbench_api.tasks.concrete.clinvar_indel_task import IndelClinvarTask
 from gfmbench_api.tasks.concrete.loleve_causal_eqtl_task import LoleveCausalEqtlTask
 
+TASK_REGISTRY: dict[str, type] = {
+    "vepeval_clinvar":                    VepevalClinvarTask,
+    "brca1":                              BRCA1Task,
+    "clinvar_indel":                      IndelClinvarTask,
+    "loleve_causal_eqtl":                LoleveCausalEqtlTask,
+    "lrb_variant_effect_causal_eqtl":    LRBCausalEqtlTask,
+    "lrb_variant_effect_pathogenic_omim": LrbVariantEffectPathogenicOmimTask,
+    "bend_variant_effects_disease":       BendVEPDisease,
+    "bend_variant_effects_expression":    BendVEPExpression,
+    "gue_promoter_all":                   GuePromoterAllTask,
+    "gue_splice_site":                    GueSpliceSiteTask,
+    "gue_transcription_factor":           GueTranscriptionFactorTask,
+    "songlab_clinvar":                    SonglabClinvarTask,
+    "traitgym_complex":                   TraitGymComplexTask,
+    "traitgym_mendelian":                 TraitGymMendelianTask,
+    "var_bench_coding_pathogenicity":     VariantBenchmarksCodingTask,
+    "var_bench_non_coding_pathogenicity": VariantBenchmarksNonCodingTask,
+    "var_bench_expression":               VariantBenchmarksExpressionTask,
+    "var_bench_common_vs_rare":           VariantBenchmarksCommonVsRareTask,
+    "var_bench_meqtl":                    VariantBenchmarksMEQTLTask,
+    "var_bench_sqtl":                     VariantBenchmarksSQTLTask,
+}
+
 # Model metadata only — adapter modules are imported lazily via get_model_class().
 MODEL_REGISTRY = {
     "DNABERT2": {
@@ -285,28 +308,10 @@ def main():
     else:
         logging.info("Using full datasets (max_num_samples=None)")
 
-    # Define all tasks to run
+    # Instantiate all tasks from the registry
     tasks = [
-        VepevalClinvarTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        IndelClinvarTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        LoleveCausalEqtlTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        BRCA1Task(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        GueTranscriptionFactorTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        GuePromoterAllTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        GueSpliceSiteTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        BendVEPExpression(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        BendVEPDisease(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        SonglabClinvarTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        VariantBenchmarksCodingTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        VariantBenchmarksNonCodingTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        VariantBenchmarksExpressionTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        VariantBenchmarksCommonVsRareTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        VariantBenchmarksMEQTLTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        VariantBenchmarksSQTLTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        TraitGymComplexTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        TraitGymMendelianTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        LrbVariantEffectPathogenicOmimTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        LRBCausalEqtlTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        cls(root_data_dir_path=root_data_dir_path, task_config=task_config)
+        for cls in TASK_REGISTRY.values()
     ]
 
     # Training parameters for fine-tuning tasks

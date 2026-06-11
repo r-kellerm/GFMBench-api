@@ -31,7 +31,7 @@ import pytest
 
 from gfmbench_api.tasks.concrete.gue_promoter_all_task import GuePromoterAllTask
 from gfmbench_api.utils.fileutils import ensure_reference_genome
-from usage_examples.benchmark_runner import TASK_REGISTRY
+from usage_examples.run_benchmark import TASK_REGISTRY
 
 EXCLUDED_DOWNLOAD_TASKS = frozenset({"vepeval_clinvar"})
 DOWNLOAD_TASKS: dict[str, Type] = {
