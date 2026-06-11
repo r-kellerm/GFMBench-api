@@ -15,6 +15,7 @@
 
 # This module does not embed third-party data download URLs.
 import argparse
+import importlib
 import logging
 import os
 import random
@@ -60,34 +61,77 @@ from gfmbench_api.tasks.concrete.variant_benchmarks_meqtl_task import VariantBen
 from gfmbench_api.tasks.concrete.variant_benchmarks_non_coding_task import VariantBenchmarksNonCodingTask
 from gfmbench_api.tasks.concrete.variant_benchmarks_sqtl_task import VariantBenchmarksSQTLTask
 from usage_examples.trainers import GFMFinetuner
-from usage_examples.sanity_models.dna_bert2_model import DNABERT2Model
-from usage_examples.sanity_models.dna_bert_model import DNABERTModel
-from usage_examples.sanity_models.evo2_model import Evo2BioNeMoModel
-from usage_examples.sanity_models.ntv3_model import NucleotideTransformerV3Model
 from gfmbench_api.tasks.concrete.brca1_task import BRCA1Task
 from gfmbench_api.tasks.concrete.clinvar_vepeval_task import VepevalClinvarTask
 from gfmbench_api.tasks.concrete.clinvar_indel_task import IndelClinvarTask
 from gfmbench_api.tasks.concrete.loleve_causal_eqtl_task import LoleveCausalEqtlTask
 
-# Mapping of model names to model classes and their default max sequence lengths
+TASK_REGISTRY: dict[str, type] = {
+    "vepeval_clinvar":                    VepevalClinvarTask,
+    "brca1":                              BRCA1Task,
+    "clinvar_indel":                      IndelClinvarTask,
+    "loleve_causal_eqtl":                LoleveCausalEqtlTask,
+    "lrb_variant_effect_causal_eqtl":    LRBCausalEqtlTask,
+    "lrb_variant_effect_pathogenic_omim": LrbVariantEffectPathogenicOmimTask,
+    "bend_variant_effects_disease":       BendVEPDisease,
+    "bend_variant_effects_expression":    BendVEPExpression,
+    "gue_promoter_all":                   GuePromoterAllTask,
+    "gue_splice_site":                    GueSpliceSiteTask,
+    "gue_transcription_factor":           GueTranscriptionFactorTask,
+    "songlab_clinvar":                    SonglabClinvarTask,
+    "traitgym_complex":                   TraitGymComplexTask,
+    "traitgym_mendelian":                 TraitGymMendelianTask,
+    "var_bench_coding_pathogenicity":     VariantBenchmarksCodingTask,
+    "var_bench_non_coding_pathogenicity": VariantBenchmarksNonCodingTask,
+    "var_bench_expression":               VariantBenchmarksExpressionTask,
+    "var_bench_common_vs_rare":           VariantBenchmarksCommonVsRareTask,
+    "var_bench_meqtl":                    VariantBenchmarksMEQTLTask,
+    "var_bench_sqtl":                     VariantBenchmarksSQTLTask,
+}
+
+# Model metadata only — adapter modules are imported lazily via get_model_class().
 MODEL_REGISTRY = {
-    "DNABERT2": {"class": DNABERT2Model, "max_length": 2500},
-    "DNABERT": {"class": DNABERTModel, "max_length": 500},
-    "Evo2": {"class": Evo2BioNeMoModel, "max_length": 8192},
+    "DNABERT2": {
+        "module": "usage_examples.sanity_models.dna_bert2_model",
+        "class": "DNABERT2Model",
+        "max_length": 2500,
+    },
+    "DNABERT": {
+        "module": "usage_examples.sanity_models.dna_bert_model",
+        "class": "DNABERTModel",
+        "max_length": 500,
+    },
+    "Evo2": {
+        "module": "usage_examples.sanity_models.evo2_model",
+        "class": "Evo2BioNeMoModel",
+        "max_length": 8192,
+    },
     "NTv3_8M": {
-        "class": NucleotideTransformerV3Model,
+        "module": "usage_examples.sanity_models.ntv3_model",
+        "class": "NucleotideTransformerV3Model",
         "max_length": 8192,
         "model_kwargs": {"model_name": "NTv3_8M_pre", "use_autocast": False},
     },
     "NTv3_100M": {
-        "class": NucleotideTransformerV3Model,
+        "module": "usage_examples.sanity_models.ntv3_model",
+        "class": "NucleotideTransformerV3Model",
         "max_length": 8192,
         "model_kwargs": {"model_name": "NTv3_100M_pre", "use_autocast": True},
     },
 }
 
 
-def parse_args():
+def get_model_class(model_name: str):
+    """Import and return the model adapter class for the given registry key."""
+    spec = MODEL_REGISTRY[model_name]
+    try:
+        module = importlib.import_module(spec["module"])
+        return getattr(module, spec["class"])
+    except ImportError as exc:
+        raise ImportError(f"Failed to import {model_name} from {spec['module']}") from exc
+
+
+def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Run benchmark tasks on a model")
     parser.add_argument(
         "--csv_path",
@@ -117,7 +161,8 @@ def parse_args():
         "--model",
         type=str,
         default="DNABERT2",
-        help="Model to use for benchmarking. Supported: DNABERT2, DNABERT, Evo2, NTv3_8M, NTv3_100M"
+        choices=list(MODEL_REGISTRY.keys()),
+        help="Model to use for benchmarking",
     )
     parser.add_argument(
         "--epochs",
@@ -156,7 +201,14 @@ def parse_args():
         action="store_true",
         help="If set, limit each dataset to 100 samples for quick testing.",
     )
-    return parser.parse_args()
+    parser.add_argument(
+        "--exclude_tasks",
+        nargs="*",
+        default=[],
+        metavar="TASK",
+        help="Task names to skip (e.g. --exclude_tasks vepeval_clinvar).",
+    )
+    return parser.parse_args(argv)
 
 
 def set_seed(seed: int):
@@ -193,11 +245,11 @@ def _format_elapsed(seconds: float) -> str:
     return f"{seconds:.1f}s"
 
 
-def main():
+def main(argv=None):
     # Initialize logging
     logutils.init_logger()
     
-    args = parse_args()
+    args = parse_args(argv)
     
     # Set device
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -219,15 +271,12 @@ def main():
     # Model configuration
     report_algo_name = args.report_algo_name
     
-    # Checkpoint path
     checkpoint_path = args.checkpoint_path
-    
-    # Get model class and max_length from registry
-    if args.model not in MODEL_REGISTRY:
-        raise ValueError(f"Unknown model: {args.model}. Supported models: {list(MODEL_REGISTRY.keys())}")
+
+
     if args.model == "Evo2" and not args.linear_prob:
         raise ValueError("Evo2 does not support full fine-tuning. Use --linear_prob for Evo2 benchmarks.")
-    ModelClass = MODEL_REGISTRY[args.model]["class"]
+    ModelClass = get_model_class(args.model)
     max_length = MODEL_REGISTRY[args.model]["max_length"]
     model_init_kwargs = MODEL_REGISTRY[args.model].get("model_kwargs", {})
     
@@ -237,7 +286,8 @@ def main():
     model = ModelClass(device=device, max_length=max_length, **model_init_kwargs)
     if checkpoint_path:
         model.load_checkpoint(checkpoint_path)
-    
+
+
     # Task configuration for DNABERT-2 (max 512 tokens by default, can extrapolate longer)
     # Supported keys: max_sequence_length, batch_size, num_workers, max_num_samples, disable_safe_model_call, disable_cache
     # Set to None for models with no sequence length limit (e.g., HyenaDNA)
@@ -258,28 +308,11 @@ def main():
     else:
         logging.info("Using full datasets (max_num_samples=None)")
 
-    # Define all tasks to run
+    # Instantiate all tasks from the registry
     tasks = [
-        VepevalClinvarTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        IndelClinvarTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        LoleveCausalEqtlTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        BRCA1Task(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        GueTranscriptionFactorTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        GuePromoterAllTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        GueSpliceSiteTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        BendVEPExpression(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        BendVEPDisease(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        SonglabClinvarTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        VariantBenchmarksCodingTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        VariantBenchmarksNonCodingTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        VariantBenchmarksExpressionTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        VariantBenchmarksCommonVsRareTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        VariantBenchmarksMEQTLTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        VariantBenchmarksSQTLTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        TraitGymComplexTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        TraitGymMendelianTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        LrbVariantEffectPathogenicOmimTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
-        LRBCausalEqtlTask(root_data_dir_path=root_data_dir_path, task_config=task_config),
+        cls(root_data_dir_path=root_data_dir_path, task_config=task_config)
+        for name, cls in TASK_REGISTRY.items()
+        if name not in args.exclude_tasks
     ]
 
     # Training parameters for fine-tuning tasks
