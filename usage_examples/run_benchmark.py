@@ -140,7 +140,7 @@ def get_model_class(model_name: str):
         raise ImportError(message) from exc
 
 
-def parse_args():
+def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Run benchmark tasks on a model")
     parser.add_argument(
         "--csv_path",
@@ -210,7 +210,7 @@ def parse_args():
         action="store_true",
         help="If set, limit each dataset to 100 samples for quick testing.",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def set_seed(seed: int):
@@ -247,11 +247,11 @@ def _format_elapsed(seconds: float) -> str:
     return f"{seconds:.1f}s"
 
 
-def main():
+def main(argv=None):
     # Initialize logging
     logutils.init_logger()
     
-    args = parse_args()
+    args = parse_args(argv)
     
     # Set device
     device = 'cuda' if torch.cuda.is_available() else 'cpu'

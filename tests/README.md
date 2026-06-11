@@ -14,7 +14,7 @@ pip install -e ".[test]"
 |------|----------------|---------|-----|
 | `tests/e2e/test_smoke.py` | Full eval pipeline with `MockGFMModel` and local fixture CSVs | No | No |
 | `tests/e2e/test_download.py` | Tasks download data into an empty temp directory | Yes | No |
-| `tests/e2e/test_heavy.py` | Real DNABERT2 benchmark on 3 tasks; scores compared to pinned baseline CSV | Yes | Recommended |
+| `tests/e2e/test_heavy.py` | Real DNABERT2 benchmark on all tasks (sanity mode); scores compared to pinned baseline CSV | Yes | Recommended |
 
 ### Smoke (`tests/e2e/test_smoke.py`)
 
@@ -26,7 +26,7 @@ Parametrized over all tasks in `TASK_REGISTRY` except `vepeval_clinvar`, plus on
 
 ### Heavy (`tests/e2e/test_heavy.py`)
 
-Two tests sharing the same DNABERT2 sanity config (3 tasks, 100 samples, linear probe, 1 epoch):
+Two tests sharing the same DNABERT2 sanity config (all tasks in `TASK_REGISTRY`, 100 samples each, linear probe, 1 epoch):
 
 | Test | Purpose |
 |------|---------|

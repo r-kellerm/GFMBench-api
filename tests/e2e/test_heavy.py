@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """
-Heavy E2E regression: run DNABERT2 on 3 tasks, compare to baseline.
+Heavy E2E regression: run DNABERT2 on all tasks in sanity mode, compare to baseline.
 
 Regression (included in ``pytest tests/``):
   pytest tests/e2e/test_heavy.py::test_heavy_sanity_regression
@@ -37,13 +37,9 @@ from tests.e2e.baseline_utils import (
     load_baseline,
     load_results,
 )
-from usage_examples.benchmark_runner import (
-    BenchmarkConfig,
-    DEFAULT_HEAVY_MODEL,
-    DEFAULT_HEAVY_TASKS,
-    run_benchmark,
-)
+from usage_examples.run_benchmark import main as run_benchmark_main
 
+DEFAULT_HEAVY_MODEL = "DNABERT2"
 DEFAULT_ATOL = 0.02
 
 
@@ -56,32 +52,48 @@ def _baseline_path(model_name: str) -> Path:
     )
 
 
+def _benchmark_argv(
+    *,
+    root_data_dir_path: Path,
+    csv_path: Path,
+    model_name: str = DEFAULT_HEAVY_MODEL,
+) -> list[str]:
+    return [
+        "--root_data_dir_path",
+        str(root_data_dir_path),
+        "--csv_path",
+        str(csv_path),
+        "--report_algo_name",
+        f"{model_name.lower()}_heavy",
+        "--model",
+        model_name,
+        "--linear_prob",
+        "--epochs",
+        "1",
+        "--sanity_check_mode",
+        "--disable_safe_model_call",
+        "--seed",
+        "0",
+    ]
+
+
 @pytest.fixture(scope="module")
 def heavy_data_root(tmp_path_factory) -> Path:
     """Shared data directory; task init downloads datasets as needed."""
     return tmp_path_factory.mktemp("heavy_data")
 
 
-@pytest.fixture
-def heavy_config(heavy_data_root, tmp_path) -> BenchmarkConfig:
-    return BenchmarkConfig(
-        root_data_dir_path=str(heavy_data_root),
-        csv_path=str(tmp_path / "heavy_results.csv"),
-        report_algo_name=f"{DEFAULT_HEAVY_MODEL.lower()}_heavy",
-        model_name=DEFAULT_HEAVY_MODEL,
-        linear_probe=True,
-        epochs=1,
-        max_num_samples=100,
-        task_names=list(DEFAULT_HEAVY_TASKS),
-        task_batch_size=8,
-        training_batch_size=8,
-        disable_safe_model_call=True,
-    )
-
-
-def _run_heavy_benchmark(config: BenchmarkConfig) -> pd.DataFrame:
-    run_benchmark(config)
-    return load_results(Path(config.csv_path))
+def _run_heavy_benchmark(
+    heavy_data_root: Path,
+    csv_path: Path,
+    model_name: str = DEFAULT_HEAVY_MODEL,
+) -> pd.DataFrame:
+    run_benchmark_main(_benchmark_argv(
+        root_data_dir_path=heavy_data_root,
+        csv_path=csv_path,
+        model_name=model_name,
+    ))
+    return load_results(csv_path)
 
 
 def _write_baseline(results_df: pd.DataFrame, baseline_path: Path) -> None:
@@ -101,10 +113,10 @@ def _write_baseline(results_df: pd.DataFrame, baseline_path: Path) -> None:
     pd.DataFrame(baseline_rows).to_csv(baseline_path, index=False)
 
 
-def test_heavy_sanity_regression(heavy_config):
-    """Run DNABERT2 on 3 tasks and compare scores to the pinned baseline CSV."""
-    model_name = heavy_config.model_name
-    baseline_path = _baseline_path(model_name)
+def test_heavy_sanity_regression(heavy_data_root, tmp_path):
+    """Run DNABERT2 on all tasks (sanity mode) and compare to the pinned baseline."""
+    csv_path = tmp_path / "heavy_results.csv"
+    baseline_path = _baseline_path(DEFAULT_HEAVY_MODEL)
 
     if not baseline_path.is_file():
         pytest.fail(
@@ -113,7 +125,7 @@ def test_heavy_sanity_regression(heavy_config):
             "pytest tests/e2e/test_heavy.py::test_heavy_update_baseline -s"
         )
 
-    results_df = _run_heavy_benchmark(heavy_config)
+    results_df = _run_heavy_benchmark(heavy_data_root, csv_path)
     baseline_df = load_baseline(baseline_path)
     failures, warnings = compare_to_baseline(
         results_df,
@@ -127,9 +139,10 @@ def test_heavy_sanity_regression(heavy_config):
     assert not failures, "Metric drift vs baseline:\n" + format_failures(failures)
 
 
-def test_heavy_update_baseline(heavy_config):
-    """Run DNABERT2 on 3 tasks and write scores to the pinned baseline CSV."""
-    baseline_path = _baseline_path(heavy_config.model_name)
-    results_df = _run_heavy_benchmark(heavy_config)
+def test_heavy_update_baseline(heavy_data_root, tmp_path):
+    """Run DNABERT2 on all tasks (sanity mode) and write the pinned baseline CSV."""
+    csv_path = tmp_path / "heavy_results.csv"
+    baseline_path = _baseline_path(DEFAULT_HEAVY_MODEL)
+    results_df = _run_heavy_benchmark(heavy_data_root, csv_path)
     _write_baseline(results_df, baseline_path)
     print(f"Wrote updated baseline to {baseline_path}")
