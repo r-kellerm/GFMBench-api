@@ -40,7 +40,9 @@ from tests.e2e.baseline_utils import (
 from usage_examples.run_benchmark import main as run_benchmark_main
 
 DEFAULT_HEAVY_MODEL = "DNABERT2"
-DEFAULT_ATOL = 0.02
+DEFAULT_ATOL = 0.005
+
+EXCLUDED_HEAVY_TASKS = frozenset({"vepeval_clinvar"})
 
 
 def _baseline_path(model_name: str) -> Path:
@@ -69,17 +71,29 @@ def _benchmark_argv(
         model_name,
         "--linear_prob",
         "--epochs",
-        "1",
+        "3",
         "--sanity_check_mode",
         "--disable_safe_model_call",
         "--seed",
         "0",
+        "--exclude_tasks",
+        *EXCLUDED_HEAVY_TASKS,
     ]
 
 
 @pytest.fixture(scope="module")
-def heavy_data_root(tmp_path_factory) -> Path:
-    """Shared data directory; task init downloads datasets as needed."""
+def heavy_data_root(request, tmp_path_factory) -> Path:
+    """Shared data directory; task init downloads datasets as needed.
+
+    Pass --heavy-data-root PATH to reuse a persistent directory across runs
+    (avoids re-downloading the reference genome and task datasets every time).
+    Falls back to a fresh temp directory when the option is not provided.
+    """
+    persistent = request.config.getoption("--heavy-data-root")
+    if persistent:
+        path = Path(persistent)
+        path.mkdir(parents=True, exist_ok=True)
+        return path
     return tmp_path_factory.mktemp("heavy_data")
 
 

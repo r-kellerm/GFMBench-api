@@ -5,6 +5,19 @@ from __future__ import annotations
 import pytest
 
 
+def pytest_addoption(parser) -> None:
+    parser.addoption(
+        "--heavy-data-root",
+        default=None,
+        metavar="PATH",
+        help=(
+            "Persistent directory for heavy-test data (reference genome, task datasets). "
+            "Reused across runs so data is only downloaded once. "
+            "Defaults to a fresh temp directory when not provided."
+        ),
+    )
+
+
 def pytest_collection_modifyitems(config, items) -> None:
     """Skip baseline-update tests unless that test is invoked explicitly by name."""
     explicit_update = any(

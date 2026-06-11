@@ -95,33 +95,28 @@ MODEL_REGISTRY = {
         "module": "usage_examples.sanity_models.dna_bert2_model",
         "class": "DNABERT2Model",
         "max_length": 2500,
-        "install_hint": "https://github.com/MAGICS-LAB/DNABERT_2/blob/main/requirements.txt",
     },
     "DNABERT": {
         "module": "usage_examples.sanity_models.dna_bert_model",
         "class": "DNABERTModel",
         "max_length": 500,
-        "install_hint": "pip install transformers",
     },
     "Evo2": {
         "module": "usage_examples.sanity_models.evo2_model",
         "class": "Evo2BioNeMoModel",
         "max_length": 8192,
-        "install_hint": "https://github.com/ArcInstitute/evo2/blob/main/pyproject.toml",
     },
     "NTv3_8M": {
         "module": "usage_examples.sanity_models.ntv3_model",
         "class": "NucleotideTransformerV3Model",
         "max_length": 8192,
         "model_kwargs": {"model_name": "NTv3_8M_pre", "use_autocast": False},
-        "install_hint": "https://github.com/instadeepai/nucleotide-transformer/blob/main/setup.py",
     },
     "NTv3_100M": {
         "module": "usage_examples.sanity_models.ntv3_model",
         "class": "NucleotideTransformerV3Model",
         "max_length": 8192,
         "model_kwargs": {"model_name": "NTv3_100M_pre", "use_autocast": True},
-        "install_hint": "https://github.com/instadeepai/nucleotide-transformer/blob/main/setup.py",
     },
 }
 
@@ -133,11 +128,7 @@ def get_model_class(model_name: str):
         module = importlib.import_module(spec["module"])
         return getattr(module, spec["class"])
     except ImportError as exc:
-        hint = spec.get("install_hint", "")
-        message = f"Failed to import {model_name} from {spec['module']}"
-        if hint:
-            message += f". Install model dependencies: {hint}"
-        raise ImportError(message) from exc
+        raise ImportError(f"Failed to import {model_name} from {spec['module']}") from exc
 
 
 def parse_args(argv=None):
@@ -209,6 +200,13 @@ def parse_args(argv=None):
         "--sanity_check_mode",
         action="store_true",
         help="If set, limit each dataset to 100 samples for quick testing.",
+    )
+    parser.add_argument(
+        "--exclude_tasks",
+        nargs="*",
+        default=[],
+        metavar="TASK",
+        help="Task names to skip (e.g. --exclude_tasks vepeval_clinvar).",
     )
     return parser.parse_args(argv)
 
@@ -311,7 +309,8 @@ def main(argv=None):
     # Instantiate all tasks from the registry
     tasks = [
         cls(root_data_dir_path=root_data_dir_path, task_config=task_config)
-        for cls in TASK_REGISTRY.values()
+        for name, cls in TASK_REGISTRY.items()
+        if name not in args.exclude_tasks
     ]
 
     # Training parameters for fine-tuning tasks
